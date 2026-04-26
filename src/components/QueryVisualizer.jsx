@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal, X, Zap, ChevronRight } from 'lucide-react';
 import api from '../api/api';
+import { useAuth } from '../context/AuthContext';
 
 const QueryVisualizer = () => {
+  const { token } = useAuth();
   const [lastSql, setLastSql] = useState('');
   const [isVisible, setIsVisible] = useState(false);
   const [explainData, setExplainData] = useState(null);
@@ -32,6 +34,9 @@ const QueryVisualizer = () => {
   };
 
   const hasQuery = lastSql.length > 0;
+
+  // Only show when authenticated
+  if (!token) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999]">
