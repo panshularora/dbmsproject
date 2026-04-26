@@ -164,10 +164,58 @@ app.get('/api/hall/:studentId', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { student_id, subject_id } = req.body;
   try {
-    // We need an exam_id. We'll default to 1 as per examinations table check.
-    const sql = 'INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, 1)';
-    const [result] = await db.query(sql, [student_id, subject_id]);
-    res.json({ message: 'Registration successful', id: result.insertId });
+    // 1. Register for Exam
+    const [regResult] = await db.query('INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, 1)', [student_id, subject_id]);
+    const registrationId = regResult.insertId;
+
+    // 2. Auto-Allocate Hall for Demo
+    const randomHall = Math.floor(Math.random() * 6) + 1;
+    const randomSeat = Math.floor(Math.random() * 60) + 1;
+    await db.query('INSERT INTO hall_allocations (registration_id, hall_id, seat_no) VALUES (?, ?, ?)', [registrationId, randomHall, randomSeat]);
+
+    res.json({ message: 'Registration & Hall Allocation successful', id: registrationId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Demo Endpoints ---
+
+// DELETE /api/demo/reset/:id
+app.post('/api/demo/reset/:id', async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    // Delete in reverse order of dependencies
+    await db.query('DELETE e FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
+    await db.query('DELETE ha FROM hall_allocations ha JOIN exam_registrations er ON ha.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
+    await db.query('DELETE FROM exam_registrations WHERE student_id = ?', [studentId]);
+    
+    res.json({ message: 'Demo data reset successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/demo/evaluate/:id
+app.post('/api/demo/evaluate/:id', async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const [registrations] = await db.query('SELECT registration_id FROM exam_registrations WHERE student_id = ?', [studentId]);
+    
+    for (const reg of registrations) {
+      const marks = (Math.random() * 40 + 60).toFixed(2); // 60-100
+      const grade = marks > 90 ? 'O' : marks > 80 ? 'A+' : marks > 70 ? 'A' : 'B';
+      
+      // Check if already evaluated
+      const [existing] = await db.query('SELECT * FROM evaluations WHERE registration_id = ?', [reg.registration_id]);
+      if (existing.length === 0) {
+        await db.query('INSERT INTO evaluations (registration_id, faculty_id, marks, grade) VALUES (?, 1, ?, ?)', [reg.registration_id, marks, grade]);
+      }
+    }
+    
+    res.json({ message: 'Mock evaluations completed' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
