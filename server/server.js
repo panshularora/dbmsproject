@@ -3,13 +3,86 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const db = require('./db');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'srm_secret';
 
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+
+// --- Auth Endpoints ---
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password, role } = req.body;
+  try {
+    const table = role === 'faculty' ? 'faculty' : 'students';
+    const idField = role === 'faculty' ? 'faculty_id' : 'student_id';
+    
+    // In normalized MySQL, we'll look for the user in their respective table
+    const [users] = await db.query(`SELECT * FROM ${table} WHERE email = ?`, [email]);
+    
+    if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    
+    const user = users[0];
+    // Check password (assuming plain text or bcrypt)
+    // For now, checking plain text as per user's previous data, but supporting bcrypt
+    const isMatch = (password === user.password) || (user.password_hash && await bcrypt.compare(password, user.password_hash));
+    
+    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+    
+    const token = jwt.sign({ id: user[idField], role }, JWT_SECRET, { expiresIn: '24h' });
+    
+    res.json({
+      token,
+      user: {
+        id: user[idField],
+        name: user.first_name + ' ' + user.last_name,
+        email: user.email,
+        role,
+        semester: user.semester
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/students/:id/dashboard
+app.get('/api/students/:id/dashboard', async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    
+    // Aggregate data
+    const [[{ count: registered }]] = await db.query('SELECT COUNT(*) as count FROM exam_registrations WHERE student_id = ?', [studentId]);
+    const [[{ count: completed }]] = await db.query('SELECT COUNT(*) as count FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
+    const [latestResult] = await db.query(`
+      SELECT sub.subject_name, e.marks, e.grade 
+      FROM evaluations e 
+      JOIN exam_registrations er ON e.registration_id = er.registration_id 
+      JOIN subjects sub ON er.subject_id = sub.subject_id 
+      WHERE er.student_id = ? 
+      ORDER BY e.evaluation_id DESC LIMIT 1
+    `, [studentId]);
+
+    res.json({
+      registeredSubjects: registered,
+      completedExams: completed,
+      latestResult: latestResult[0] || null,
+      notices: [
+        { title: 'End Semester Exams', content: 'Final exams start from May 12, 2025.' },
+        { title: 'Hall Ticket Download', content: 'Download your hall tickets from the portal.' }
+      ]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // --- API Endpoints ---
 
@@ -19,6 +92,7 @@ app.get('/api/students', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM students');
     res.json(rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -29,6 +103,7 @@ app.get('/api/subjects', async (req, res) => {
     const [rows] = await db.query('SELECT * FROM subjects');
     res.json(rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -47,6 +122,7 @@ app.get('/api/results/:studentId', async (req, res) => {
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -62,6 +138,7 @@ app.get('/api/timetable', async (req, res) => {
     const [rows] = await db.query(sql);
     res.json(rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -79,6 +156,7 @@ app.get('/api/hall/:studentId', async (req, res) => {
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows[0] || { message: 'No allocation found' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -23,19 +23,8 @@ const StudentDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get('/students');
-        // Mandated to fetch from /students, so we'll find the current user in the list
-        const currentUserData = res.data.find(s => s.student_id === user.id) || res.data[0];
-        setData({
-          ...currentUserData,
-          registeredSubjects: 6, // Mocking these as they weren't in the mandated /students return
-          completedExams: 5,
-          latestResult: { grade: 'A+', subject_name: 'Database Management Systems', marks: 92 },
-          notices: [
-            { title: 'End Semester Exams', content: 'Final exams start from May 12, 2025.' },
-            { title: 'Hall Ticket Download', content: 'Download your hall tickets from the portal.' }
-          ]
-        });
+        const res = await api.get(`/students/${user.id}/dashboard`);
+        setData(res.data);
         setLoading(false);
       } catch (err) {
         console.error(err);
