@@ -27,16 +27,19 @@ const Registration = () => {
   const handleRegister = async () => {
     setSubmitting(true);
     try {
-      // Mandated to insert into exam_registrations
-      // We'll register the first selected subject for demonstration
-      await api.post('/register', {
-        student_id: user.id,
-        subject_id: selected[0],
-        exam_id: 1 // Default exam
-      });
-      alert('Registration successful!');
+      // Send registration request for every selected subject
+      await Promise.all(
+        selected.map(subjectId => 
+          api.post('/register', {
+            student_id: user.id,
+            subject_id: subjectId,
+            exam_id: 1 // Default exam
+          })
+        )
+      );
+      alert('Registration successful for all selected subjects!');
     } catch (err) {
-      alert('Registration failed.');
+      alert(err.response?.data?.error || 'Registration failed.');
     } finally {
       setSubmitting(false);
     }

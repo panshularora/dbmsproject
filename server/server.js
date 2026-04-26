@@ -161,10 +161,17 @@ app.get('/api/timetable', async (req, res) => {
   }
 });
 
-// GET /api/malpractice/:roll_no
-app.get('/api/malpractice/:roll_no', async (req, res) => {
+// GET /api/malpractice/:studentId
+app.get('/api/malpractice/:studentId', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM malpractice WHERE roll_no = ?', [req.params.roll_no]);
+    const sql = `
+      SELECT m.*, sub.subject_name
+      FROM malpractice m
+      JOIN exam_registrations er ON m.registration_id = er.registration_id
+      JOIN subjects sub ON er.subject_id = sub.subject_id
+      WHERE er.student_id = ?
+    `;
+    const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -191,35 +198,14 @@ app.get('/api/hall/:studentId', async (req, res) => {
   }
 });
 
-// POST /api/register
-app.post('/api/register', async (req, res) => {
-  const { student_id, subject_id } = req.body;
-  try {
-    // 1. Register for Exam
-    const [regResult] = await db.query('INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, 1)', [student_id, subject_id]);
-    const registrationId = regResult.insertId;
-
-    // 2. Auto-Allocate Hall for Demo
-    const randomHall = Math.floor(Math.random() * 6) + 1;
-    const randomSeat = Math.floor(Math.random() * 60) + 1;
-    await db.query('INSERT INTO hall_allocations (registration_id, hall_id, seat_no) VALUES (?, ?, ?)', [registrationId, randomHall, randomSeat]);
-
-    res.json({ message: 'Registration & Hall Allocation successful', id: registrationId });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // --- Demo Endpoints ---
 
 // POST /api/demo/caught/:id
 app.post('/api/demo/caught/:id', async (req, res) => {
   try {
     const studentId = req.params.id;
-    const [[student]] = await db.query('SELECT roll_no, name, semester FROM students WHERE student_id = ?', [studentId]);
     const [[registration]] = await db.query(`
-      SELECT sub.subject_name 
+      SELECT er.registration_id, sub.subject_name 
       FROM exam_registrations er 
       JOIN subjects sub ON er.subject_id = sub.subject_id 
       WHERE er.student_id = ? LIMIT 1
@@ -228,16 +214,14 @@ app.post('/api/demo/caught/:id', async (req, res) => {
     if (!registration) return res.status(400).json({ error: 'Please register for a subject first!' });
 
     await db.query(`
-      INSERT INTO malpractice (roll_no, name, semester, subject_name, description, reported_by, action_taken) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO malpractice (registration_id, description, reported_by, action_taken, status) 
+      VALUES (?, ?, ?, ?, ?)
     `, [
-      student.roll_no, 
-      student.name, 
-      student.semester, 
-      registration.subject_name, 
-      'Student found using mobile phone during exam', 
+      registration.registration_id, 
+      `Student found using mobile phone during ${registration.subject_name} exam`, 
       'Dr. Rajesh Kumar', 
-      'Exam cancelled'
+      'Exam cancelled',
+      'Confirmed'
     ]);
     
     res.json({ message: 'You have been caught! Check Malpractice section.' });
@@ -251,15 +235,40 @@ app.post('/api/demo/caught/:id', async (req, res) => {
 app.post('/api/demo/reset/:id', async (req, res) => {
   try {
     const studentId = req.params.id;
-    const [[student]] = await db.query('SELECT roll_no FROM students WHERE student_id = ?', [studentId]);
     
     // Delete in reverse order of dependencies
+    await db.query('DELETE m FROM malpractice m JOIN exam_registrations er ON m.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
     await db.query('DELETE e FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
     await db.query('DELETE ha FROM hall_allocations ha JOIN exam_registrations er ON ha.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
-    await db.query('DELETE FROM malpractice WHERE roll_no = ?', [student.roll_no]);
     await db.query('DELETE FROM exam_registrations WHERE student_id = ?', [studentId]);
     
     res.json({ message: 'Demo data reset successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/register
+app.post('/api/register', async (req, res) => {
+  const { student_id, subject_id } = req.body;
+  try {
+    // 0. Check if already registered
+    const [existing] = await db.query('SELECT * FROM exam_registrations WHERE student_id = ? AND subject_id = ?', [student_id, subject_id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Already registered for this subject!' });
+    }
+
+    // 1. Register for Exam
+    const [regResult] = await db.query('INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, 1)', [student_id, subject_id]);
+    const registrationId = regResult.insertId;
+
+    // 2. Auto-Allocate Hall for Demo
+    const randomHall = Math.floor(Math.random() * 6) + 1;
+    const randomSeat = Math.floor(Math.random() * 60) + 1;
+    await db.query('INSERT INTO hall_allocations (registration_id, hall_id, seat_no) VALUES (?, ?, ?)', [registrationId, randomHall, randomSeat]);
+
+    res.json({ message: 'Registration & Hall Allocation successful', id: registrationId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

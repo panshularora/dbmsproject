@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, ShieldAlert, FileText, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -12,7 +12,7 @@ const Malpractice = () => {
   useEffect(() => {
     const fetchRecords = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/students/${user.id}/malpractice`);
+        const res = await api.get(`/malpractice/${user.id}`);
         setRecords(res.data);
         setLoading(false);
       } catch (err) {

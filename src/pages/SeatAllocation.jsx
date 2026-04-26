@@ -34,6 +34,19 @@ const SeatAllocation = () => {
   const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
   const cols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+  const getSeatString = (seatNo) => {
+    if (!seatNo) return '';
+    const num = parseInt(seatNo, 10);
+    if (isNaN(num)) return seatNo; // If it's somehow already a string like "A1"
+    const rIndex = Math.floor((num - 1) / 10);
+    const c = ((num - 1) % 10) + 1;
+    // Fallback if seat is somehow out of bounds (e.g. > 100)
+    const r = rows[rIndex] || 'X';
+    return `${r}${c}`;
+  };
+
+  const mySeatString = getSeatString(allocation?.seat_no);
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-12 h-12 border-4 border-cems-blue border-t-transparent rounded-full animate-spin"></div>
@@ -106,7 +119,7 @@ const SeatAllocation = () => {
                   <div className="w-12 h-12 flex items-center justify-center text-[10px] font-black text-gray-700">{r}</div>
                   {cols.map((c, ci) => {
                     const seatId = `${r}${c}`;
-                    const isMySeat = allocation?.seat_no === seatId;
+                    const isMySeat = seatId === mySeatString;
                     return (
                       <motion.div 
                         key={seatId}
@@ -165,7 +178,7 @@ const SeatAllocation = () => {
                       transition={{ duration: 0.8 }}
                       className="w-24 h-24 bg-white/10 backdrop-blur-xl rounded-[2rem] flex items-center justify-center border border-white/20 shadow-2xl"
                     >
-                      <span className="text-5xl font-black text-white italic drop-shadow-lg">{allocation.seat_no}</span>
+                      <span className="text-4xl font-black text-white italic drop-shadow-lg">{mySeatString}</span>
                     </motion.div>
                     <div>
                       <h4 className="text-3xl font-black text-white italic tracking-tighter leading-none mb-2">{allocation.hall_name}</h4>
