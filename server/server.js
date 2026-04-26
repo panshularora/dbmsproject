@@ -59,28 +59,11 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
     
     const [[{ count: registered }]] = await db.query('SELECT COUNT(*) as count FROM exam_registrations WHERE student_id = ?', [studentId]);
     const [[{ count: completed }]] = await db.query('SELECT COUNT(*) as count FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
-    const [latestResult] = await db.query(`
-      SELECT sub.subject_name, e.marks, e.grade 
-      FROM evaluations e 
-      JOIN exam_registrations er ON e.registration_id = er.registration_id
-      JOIN subjects sub ON er.subject_id = sub.subject_id 
-      WHERE er.student_id = ? 
-      ORDER BY e.evaluation_id DESC LIMIT 1
-    `, [studentId]);
+    const [latestResultSets] = await db.query('CALL GetLatestResult(?)', [studentId]);
+    const latestResult = latestResultSets[0];
 
-    const [timeline] = await db.query(`
-      SELECT 
-        sub.subject_name as subject, 
-        t.exam_date as date, t.exam_time as time,
-        h.hall_name, ha.seat_no
-      FROM exam_timetable t
-      JOIN subjects sub ON t.subject_id = sub.subject_id
-      JOIN exam_registrations er ON er.subject_id = t.subject_id
-      LEFT JOIN hall_allocations ha ON ha.registration_id = er.registration_id
-      LEFT JOIN exam_halls h ON ha.hall_id = h.hall_id
-      WHERE er.student_id = ?
-      ORDER BY t.exam_date ASC
-    `, [studentId]);
+    const [timelineSets] = await db.query('CALL GetDashboardTimeline(?)', [studentId]);
+    const timeline = timelineSets[0];
 
     res.json({
       registeredSubjects: registered,
@@ -125,16 +108,8 @@ app.get('/api/subjects', async (req, res) => {
 // GET /api/results/:studentId
 app.get('/api/results/:studentId', async (req, res) => {
   try {
-    const sql = `
-      SELECT s.name, sub.subject_name, e.marks, e.grade
-      FROM students s
-      JOIN exam_registrations er ON s.student_id = er.student_id
-      JOIN evaluations e ON er.registration_id = e.registration_id
-      JOIN subjects sub ON er.subject_id = sub.subject_id
-      WHERE s.student_id = ?
-    `;
-    const [rows] = await db.query(sql, [req.params.studentId]);
-    res.json(rows);
+    const [resultSets] = await db.query('CALL GetStudentResults(?)', [req.params.studentId]);
+    res.json(resultSets[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -145,15 +120,8 @@ app.get('/api/results/:studentId', async (req, res) => {
 app.get('/api/timetable/:studentId', async (req, res) => {
   try {
     const studentId = req.params.studentId;
-    const sql = `
-      SELECT sub.subject_name, sub.subject_id, t.exam_date, t.exam_time
-      FROM exam_timetable t
-      JOIN subjects sub ON t.subject_id = sub.subject_id
-      JOIN exam_registrations er ON sub.subject_id = er.subject_id
-      WHERE er.student_id = ?
-    `;
-    const [rows] = await db.query(sql, [studentId]);
-    res.json(rows);
+    const [resultSets] = await db.query('CALL GetStudentTimetable(?)', [studentId]);
+    res.json(resultSets[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -197,16 +165,8 @@ app.get('/api/malpractice/:studentId', async (req, res) => {
 // GET /api/hall/:studentId
 app.get('/api/hall/:studentId', async (req, res) => {
   try {
-    const sql = `
-      SELECT h.hall_name, ha.seat_no, sub.subject_name, sub.subject_id
-      FROM hall_allocations ha
-      JOIN exam_halls h ON ha.hall_id = h.hall_id
-      JOIN exam_registrations er ON ha.registration_id = er.registration_id
-      JOIN subjects sub ON er.subject_id = sub.subject_id
-      WHERE er.student_id = ?
-    `;
-    const [rows] = await db.query(sql, [req.params.studentId]);
-    res.json(rows);
+    const [resultSets] = await db.query('CALL GetStudentHallAllocation(?)', [req.params.studentId]);
+    res.json(resultSets[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -268,20 +228,9 @@ app.post('/api/demo/reset/:id', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { student_id, subject_id } = req.body;
   try {
-    // 0. Check if already registered
-    const [existing] = await db.query('SELECT * FROM exam_registrations WHERE student_id = ? AND subject_id = ?', [student_id, subject_id]);
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'Already registered for this subject!' });
-    }
-
-    // 1. Register for Exam
-    const [regResult] = await db.query('INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, 1)', [student_id, subject_id]);
-    const registrationId = regResult.insertId;
-
-    // 2. Auto-Allocate Hall for Demo
-    const randomHall = Math.floor(Math.random() * 6) + 1;
-    const randomSeat = Math.floor(Math.random() * 60) + 1;
-    await db.query('INSERT INTO hall_allocations (registration_id, hall_id, seat_no) VALUES (?, ?, ?)', [registrationId, randomHall, randomSeat]);
+    // 1. Register for Exam via Stored Procedure
+    const [resultSets] = await db.query('CALL RegisterForExam(?, ?)', [student_id, subject_id]);
+    const registrationId = resultSets[0][0].registrationId;
 
     res.json({ message: 'Registration & Hall Allocation successful', id: registrationId });
   } catch (err) {
