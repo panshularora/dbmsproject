@@ -176,14 +176,15 @@ app.get('/api/malpractice/:roll_no', async (req, res) => {
 app.get('/api/hall/:studentId', async (req, res) => {
   try {
     const sql = `
-      SELECT h.hall_name, ha.seat_no
+      SELECT h.hall_name, ha.seat_no, sub.subject_name, sub.subject_id
       FROM hall_allocations ha
       JOIN exam_halls h ON ha.hall_id = h.hall_id
       JOIN exam_registrations er ON ha.registration_id = er.registration_id
+      JOIN subjects sub ON er.subject_id = sub.subject_id
       WHERE er.student_id = ?
     `;
     const [rows] = await db.query(sql, [req.params.studentId]);
-    res.json(rows[0] || { message: 'No allocation found' });
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

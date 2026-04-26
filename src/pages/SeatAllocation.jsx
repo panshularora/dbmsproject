@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, User, CheckCircle2, Navigation, Info, Shield } from 'lucide-react';
+import { MapPin, User, CheckCircle2, Navigation, Info, Shield, ChevronDown } from 'lucide-react';
 
 const SeatAllocation = () => {
   const { user } = useAuth();
-  const [allocation, setAllocation] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [allocations, setAllocations] = useState([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get('subjectId') || '');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchSeat = async () => {
+    const fetchSeats = async () => {
       try {
         const res = await api.get(`/hall/${user.id}`);
-        setAllocation(res.data);
+        setAllocations(Array.isArray(res.data) ? res.data : []);
+        if (res.data.length > 0 && !selectedSubjectId) {
+          setSelectedSubjectId(res.data[0].subject_id || '');
+        }
         setLoading(false);
       } catch (err) {
         console.error(err);
         setLoading(false);
       }
     };
-    fetchSeat();
+    fetchSeats();
   }, [user.id]);
+
+  const allocation = allocations.find(a => String(a.subject_id) === String(selectedSubjectId)) || allocations[0];
 
   const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
   const cols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -41,7 +49,23 @@ const SeatAllocation = () => {
       >
         <div>
           <h1 className="text-4xl font-black text-white mb-3 italic tracking-tighter">Strategic Seat Matrix</h1>
-          <p className="text-gray-500 font-medium italic">High-fidelity spatial allocation for Hall: <span className="text-cems-blue font-bold">{allocation?.hall_name || 'N/A'}</span></p>
+          <div className="flex items-center gap-4">
+            <p className="text-gray-500 font-medium italic">High-fidelity spatial allocation for Hall: <span className="text-cems-blue font-bold">{allocation?.hall_name || 'N/A'}</span></p>
+            {allocations.length > 1 && (
+              <div className="relative">
+                <select 
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-1 text-[10px] font-bold text-cems-blue focus:outline-none focus:border-cems-blue/50 transition-all cursor-pointer pr-8"
+                >
+                  {allocations.map(a => (
+                    <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-cems-blue pointer-events-none" />
+              </div>
+            )}
+          </div>
         </div>
         <div className="p-4 glass-card rounded-2xl border border-white/5 flex items-center gap-3">
           <Shield className="text-green-500" size={20} />
@@ -144,8 +168,9 @@ const SeatAllocation = () => {
                       <span className="text-5xl font-black text-white italic drop-shadow-lg">{allocation.seat_no}</span>
                     </motion.div>
                     <div>
-                      <h4 className="text-3xl font-black text-white italic tracking-tighter leading-none mb-2">{allocation.hall_name.split('?"')[0].trim()}</h4>
-                      <p className="text-white/70 text-xs font-bold uppercase tracking-widest">{allocation.hall_name.split('?"')[1]?.trim() || 'Level 2 Sector A'}</p>
+                      <h4 className="text-3xl font-black text-white italic tracking-tighter leading-none mb-2">{allocation.hall_name}</h4>
+                      <p className="text-cems-blue text-xs font-black uppercase tracking-[0.2em] mb-2">{allocation.subject_name}</p>
+                      <p className="text-white/70 text-xs font-bold uppercase tracking-widest">Level 2 Sector A</p>
                     </div>
                   </div>
                   

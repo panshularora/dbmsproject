@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { Clock, MapPin, Calendar, CheckCircle, Timer } from 'lucide-react';
 
 const StudentTimetable = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [timetable, setTimetable] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +36,7 @@ const StudentTimetable = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <header>
         <h1 className="text-3xl font-black text-white mb-2">Examination Timetable</h1>
-        <p className="text-gray-500 font-medium italic">Your personalized exam schedule for Semester {user?.semester || 1}.</p>
+        <p className="text-gray-500 font-medium italic">Your personalized exam schedule for Semester {user?.semester || 1}. Click on a subject to see seat allocation.</p>
       </header>
 
       <div className="bg-cems-card rounded-[2.5rem] border border-gray-800 overflow-hidden shadow-2xl">
@@ -51,7 +53,11 @@ const StudentTimetable = () => {
             </thead>
             <tbody>
               {timetable.map((row) => (
-                <tr key={row.timetable_id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors group">
+                <tr 
+                  key={row.timetable_id} 
+                  onClick={() => navigate(`/student/seat?subjectId=${row.subject_id}`)}
+                  className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors group cursor-pointer"
+                >
                   <td className="px-8 py-6">
                     <div className="font-bold text-white group-hover:text-cems-blue transition-colors">{row.subject_name}</div>
                     <div className="text-[10px] text-gray-600 mt-1 font-mono tracking-tighter">SUB-ID: {row.subject_id}</div>
