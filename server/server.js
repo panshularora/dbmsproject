@@ -140,10 +140,132 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
 
 // --- API Endpoints ---
 
-// GET /api/students
-app.get('/api/students', async (req, res) => {
+// GET /api/students (Faculty: optional ?search= & ?semester=)
+app.get('/api/students', authenticateToken, requireRole('faculty'), async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM students');
+    const search = (req.query.search || '').trim();
+    const semester = req.query.semester || '';
+
+    let sql = 'SELECT * FROM students WHERE 1=1';
+    const params = [];
+
+    if (semester !== '' && semester !== null && !Number.isNaN(Number(semester))) {
+      sql += ' AND semester = ?';
+      params.push(Number(semester));
+    }
+
+    if (search) {
+      sql += ' AND (name LIKE ? OR roll_no LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like);
+    }
+
+    sql += ' ORDER BY name, roll_no';
+
+    const [rows] = await db.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/faculty/:id/evaluations (assigned rows for this faculty)
+app.get('/api/faculty/:id/evaluations', authenticateToken, requireRole('faculty'), async (req, res) => {
+  try {
+    if (String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ error: 'Access denied: wrong faculty' });
+    }
+    const facultyId = req.params.id;
+    const sql = `
+      SELECT
+        e.evaluation_id,
+        e.registration_id,
+        e.marks,
+        e.grade,
+        s.name AS student_name,
+        s.roll_no,
+        sub.subject_name,
+        CASE
+          WHEN e.marks IS NULL THEN 'Pending'
+          ELSE 'Graded'
+        END AS status
+      FROM evaluations e
+      JOIN exam_registrations er ON e.registration_id = er.registration_id
+      JOIN students s ON er.student_id = s.student_id
+      JOIN subjects sub ON er.subject_id = sub.subject_id
+      WHERE e.faculty_id = ?
+      ORDER BY e.evaluation_id DESC
+    `;
+    const [rows] = await db.query(sql, [facultyId]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/evaluations/:evaluationId (update marks; grade from DB triggers)
+app.put('/api/evaluations/:evaluationId', [
+  authenticateToken,
+  requireRole('faculty'),
+  body('marks').isFloat({ min: 0, max: 100 })
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  const evaluationId = req.params.evaluationId;
+  const { marks } = req.body;
+  try {
+    const [[row]] = await db.query('SELECT faculty_id FROM evaluations WHERE evaluation_id = ?', [evaluationId]);
+    if (!row) return res.status(404).json({ error: 'Evaluation not found' });
+    if (row.faculty_id !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied: not your evaluation' });
+    }
+    await db.query('UPDATE evaluations SET marks = ? WHERE evaluation_id = ?', [marks, evaluationId]);
+    res.json({ message: 'Evaluation updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/malpractice (faculty: report by registration_id)
+app.post('/api/malpractice', [
+  authenticateToken,
+  requireRole('faculty'),
+  body('registration_id').isInt(),
+  body('description').trim().notEmpty(),
+  body('action_taken').optional().isString(),
+  body('status').optional().isString()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  const { registration_id, description, action_taken, status } = req.body;
+  const reportedBy = (req.body.reported_by && String(req.body.reported_by)) || (req.user.name || 'Faculty');
+  try {
+    const [[er]] = await db.query('SELECT er.registration_id FROM exam_registrations er WHERE er.registration_id = ?', [registration_id]);
+    if (!er) return res.status(400).json({ error: 'Invalid registration_id' });
+    const at = action_taken || 'Under Investigation';
+    const st = status || 'Pending';
+    const [r] = await db.query(
+      'INSERT INTO malpractice (registration_id, description, reported_by, action_taken, status) VALUES (?, ?, ?, ?, ?)',
+      [registration_id, description, reportedBy, at, st]
+    );
+    res.json({ message: 'Malpractice report recorded', malpractice_id: r.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/audit-log (latest rows; faculty only)
+app.get('/api/audit-log', authenticateToken, requireRole('faculty'), async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(String(req.query.limit || '100'), 10) || 100, 500);
+    const [rows] = await db.query(
+      'SELECT audit_id, table_name, action, pk_value, old_data, new_data, changed_at FROM audit_log ORDER BY audit_id DESC LIMIT ?',
+      [limit]
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -443,6 +565,76 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', database: 'MySQL' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend Server running on http://localhost:${PORT}`);
+async function tableColumns(tableName) {
+  const [rows] = await db.query(`SHOW COLUMNS FROM \`${tableName}\``);
+  return new Set(rows.map((r) => r.Field));
+}
+
+async function ensureDemoUsers() {
+  // If the DB has no seed users, login is impossible. We create minimal demo users
+  // using only the columns that exist in the current schema.
+  try {
+    // Faculty
+    const [[{ count: facultyCount }]] = await db.query('SELECT COUNT(*) as count FROM faculty');
+    if (facultyCount === 0) {
+      const cols = await tableColumns('faculty');
+      const insertCols = [];
+      const insertVals = [];
+
+      if (cols.has('name')) { insertCols.push('name'); insertVals.push('Demo Faculty'); }
+      if (cols.has('email')) { insertCols.push('email'); insertVals.push('faculty@srm.edu.in'); }
+      if (cols.has('department')) { insertCols.push('department'); insertVals.push('CSE'); }
+
+      if (cols.has('password')) {
+        insertCols.push('password'); insertVals.push('faculty');
+      } else if (cols.has('password_hash')) {
+        insertCols.push('password_hash'); insertVals.push(await bcrypt.hash('faculty', 10));
+      }
+
+      if (insertCols.length > 0) {
+        await db.query(
+          `INSERT INTO faculty (${insertCols.map((c) => `\`${c}\``).join(', ')}) VALUES (${insertCols.map(() => '?').join(', ')})`,
+          insertVals
+        );
+      }
+    }
+
+    // Students
+    const [[{ count: studentCount }]] = await db.query('SELECT COUNT(*) as count FROM students');
+    if (studentCount === 0) {
+      const cols = await tableColumns('students');
+      const insertCols = [];
+      const insertVals = [];
+
+      if (cols.has('name')) { insertCols.push('name'); insertVals.push('Keerthi Nair'); }
+      if (cols.has('roll_no')) { insertCols.push('roll_no'); insertVals.push('CS101'); }
+      if (cols.has('email')) { insertCols.push('email'); insertVals.push('student@srm.edu.in'); }
+      if (cols.has('course')) { insertCols.push('course'); insertVals.push('B.Tech CSE'); }
+      if (cols.has('semester')) { insertCols.push('semester'); insertVals.push(4); }
+      if (cols.has('gpa')) { insertCols.push('gpa'); insertVals.push(0.0); }
+      if (cols.has('phone_no')) { insertCols.push('phone_no'); insertVals.push('9999999999'); }
+
+      if (cols.has('password')) {
+        insertCols.push('password'); insertVals.push('student');
+      } else if (cols.has('password_hash')) {
+        insertCols.push('password_hash'); insertVals.push(await bcrypt.hash('student', 10));
+      }
+
+      if (insertCols.length > 0) {
+        await db.query(
+          `INSERT INTO students (${insertCols.map((c) => `\`${c}\``).join(', ')}) VALUES (${insertCols.map(() => '?').join(', ')})`,
+          insertVals
+        );
+      }
+    }
+  } catch (err) {
+    // Don't crash server if schema differs; log and continue.
+    console.warn('Demo user seed skipped:', err.message);
+  }
+}
+
+ensureDemoUsers().finally(() => {
+  app.listen(PORT, () => {
+    console.log(`Backend Server running on http://localhost:${PORT}`);
+  });
 });

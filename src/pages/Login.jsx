@@ -13,6 +13,16 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const fillDemo = (nextRole) => {
+    if (nextRole === 'faculty') {
+      setEmail('dr..rajesh.kumar@srm.edu.in');
+      setPassword('faculty123');
+    } else {
+      setEmail('keerthi.nair@srm.edu.in');
+      setPassword('student123');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -132,7 +142,7 @@ const Login = () => {
               className="absolute inset-y-1.5 left-1.5 w-[calc(50%-6px)] bg-cems-card rounded-xl shadow-xl border border-white/5"
             />
             <button
-              onClick={() => setRole('student')}
+              onClick={() => { setRole('student'); fillDemo('student'); }}
               className={`flex-1 flex items-center justify-center gap-3 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all relative z-10 ${
                 role === 'student' ? 'text-white' : 'text-gray-500'
               }`}
@@ -140,7 +150,7 @@ const Login = () => {
               <UserCheck size={18} /> Student
             </button>
             <button
-              onClick={() => setRole('faculty')}
+              onClick={() => { setRole('faculty'); fillDemo('faculty'); }}
               className={`flex-1 flex items-center justify-center gap-3 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all relative z-10 ${
                 role === 'faculty' ? 'text-white' : 'text-gray-500'
               }`}
@@ -203,6 +213,14 @@ const Login = () => {
                 <>Authorize Access <ArrowRight size={18} /></>
               )}
             </motion.button>
+
+            <button
+              type="button"
+              onClick={() => fillDemo(role)}
+              className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] transition-all"
+            >
+              Use demo credentials
+            </button>
           </form>
 
           <div className="mt-12 flex items-center justify-center gap-2 text-xs font-medium text-gray-600">

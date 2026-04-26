@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, Plus, Search, Filter, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,7 +29,7 @@ const FacultyMalpractice = () => {
 
   const fetchRecords = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/malpractice');
+      const res = await api.get('/malpractice');
       setRecords(res.data);
       setLoading(false);
     } catch (err) {
@@ -41,7 +41,14 @@ const FacultyMalpractice = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/malpractice', formData);
+      const { registration_id, description, action_taken, status, reported_by } = formData;
+      await api.post('/malpractice', {
+        registration_id: parseInt(String(registration_id), 10),
+        description,
+        action_taken,
+        status,
+        reported_by: reported_by || user.name
+      });
       setShowForm(false);
       fetchRecords();
     } catch (err) {
@@ -89,13 +96,13 @@ const FacultyMalpractice = () => {
                     onChange={(e) => setFormData({...formData, roll_no: e.target.value})} />
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Student Name</label>
-                  <input type="text" required className="w-full bg-cems-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white" 
-                    onChange={(e) => setFormData({...formData, student_name: e.target.value, student_id: 1})} />
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Student name (info only)</label>
+                  <input type="text" className="w-full bg-cems-bg/30 border border-white/10 rounded-xl px-4 py-3 text-gray-400" 
+                    onChange={(e) => setFormData({...formData, student_name: e.target.value})} />
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Subject</label>
-                  <input type="text" required className="w-full bg-cems-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white" 
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Subject (info only)</label>
+                  <input type="text" className="w-full bg-cems-bg/30 border border-white/10 rounded-xl px-4 py-3 text-gray-400" 
                     onChange={(e) => setFormData({...formData, subject_name: e.target.value})} />
                 </div>
                 <div className="space-y-2 col-span-2">

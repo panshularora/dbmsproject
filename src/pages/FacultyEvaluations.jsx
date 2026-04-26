@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Filter, Edit3, X, Check } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const FacultyEvaluations = () => {
 
   const fetchEvals = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/faculty/${user.id}/evaluations`);
+      const res = await api.get(`/faculty/${user.id}/evaluations`);
       setEvaluations(res.data);
       setLoading(false);
     } catch (err) {
@@ -26,9 +26,8 @@ const FacultyEvaluations = () => {
   };
 
   const handleUpdate = async (id) => {
-    const grade = parseInt(marks) >= 90 ? 'O' : parseInt(marks) >= 80 ? 'A+' : parseInt(marks) >= 70 ? 'A' : parseInt(marks) >= 40 ? 'B+' : 'F';
     try {
-      await axios.put(`http://localhost:5000/api/evaluations/${id}`, { marks: parseInt(marks), grade });
+      await api.put(`/evaluations/${id}`, { marks: parseFloat(marks) });
       setEditing(null);
       fetchEvals();
     } catch (err) {

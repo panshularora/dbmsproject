@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Database, Search, Zap, CheckCircle, DatabaseZap, Layout, BarChart3 } from 'lucide-react';
+import { Database, Zap, CheckCircle, DatabaseZap, Layout, BarChart3, ScrollText, X } from 'lucide-react';
 import api from '../api/api';
 
 const DatabaseSchema = () => {
@@ -9,6 +9,27 @@ const DatabaseSchema = () => {
   const [analytics, setAnalytics] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditRows, setAuditRows] = useState([]);
+  const [auditError, setAuditError] = useState(null);
+
+  const loadAudit = async () => {
+    try {
+      const res = await api.get('/audit-log', { params: { limit: 200 } });
+      setAuditRows(res.data || []);
+      setAuditError(null);
+    } catch (err) {
+      setAuditError(err.response?.data?.error || err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (!auditOpen) return;
+    loadAudit();
+    const t = setInterval(loadAudit, 2000);
+    return () => clearInterval(t);
+  }, [auditOpen]);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -56,6 +77,93 @@ const DatabaseSchema = () => {
           </div>
         </div>
       </header>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card p-8 rounded-[2rem] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6"
+      >
+        <div className="flex items-start gap-4">
+          <div className="p-4 bg-emerald-500/10 text-emerald-400 rounded-2xl">
+            <ScrollText size={32} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">Audit log table</h2>
+            <p className="text-gray-400 text-sm max-w-2xl">
+              MySQL triggers write INSERT, UPDATE, and DELETE changes on core tables to <code className="text-emerald-400/90 font-mono text-xs">audit_log</code>. Run{' '}
+              <code className="text-gray-500 font-mono text-xs">audit_log.sql</code> and <code className="text-gray-500 font-mono text-xs">audit_triggers.sql</code> in MySQL, then use Show-Off for a live view.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setAuditOpen(true); loadAudit(); }}
+          className="shrink-0 px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 transition-all"
+        >
+          Show-Off
+        </button>
+      </motion.div>
+
+      {auditOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col rounded-[2rem] border border-white/10 bg-gray-900 shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h3 className="text-xl font-black text-white flex items-center gap-3">
+                <ScrollText className="text-emerald-400" size={24} />
+                Live audit log
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAuditOpen(false)}
+                className="p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close"
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <p className="px-6 pb-2 text-[10px] text-gray-500 font-mono">
+              {auditError || 'Refreshes every 2s while this panel is open.'}
+            </p>
+            <div className="flex-1 overflow-auto p-4">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-800 font-black uppercase tracking-widest text-[10px]">
+                    <th className="p-3">ID</th>
+                    <th className="p-3">Table</th>
+                    <th className="p-3">Action</th>
+                    <th className="p-3">PK</th>
+                    <th className="p-3">When</th>
+                    <th className="p-3">Old</th>
+                    <th className="p-3">New</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-300">
+                  {auditRows.map((r) => (
+                    <tr key={r.audit_id} className="border-b border-gray-800/50 hover:bg-white/5">
+                      <td className="p-3 font-mono text-gray-500">{r.audit_id}</td>
+                      <td className="p-3 text-emerald-400/90 font-mono">{r.table_name}</td>
+                      <td className="p-3 text-yellow-400/90">{r.action}</td>
+                      <td className="p-3 font-mono">{r.pk_value ?? '—'}</td>
+                      <td className="p-3 text-gray-500 whitespace-nowrap">
+                        {r.changed_at ? new Date(r.changed_at).toLocaleString() : '—'}
+                      </td>
+                      <td className="p-3 max-w-xs align-top break-all font-mono text-[10px] text-red-300/80">
+                        {r.old_data != null ? (typeof r.old_data === 'string' ? r.old_data : JSON.stringify(r.old_data)) : '—'}
+                      </td>
+                      <td className="p-3 max-w-xs align-top break-all font-mono text-[10px] text-blue-300/80">
+                        {r.new_data != null ? (typeof r.new_data === 'string' ? r.new_data : JSON.stringify(r.new_data)) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!auditError && auditRows.length === 0 && (
+                <p className="p-8 text-center text-gray-500 italic">No rows yet. Apply triggers and make a change in the app.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Normalization Documentation */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

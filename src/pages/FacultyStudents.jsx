@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { Search, GraduationCap, Phone, Mail, Book } from 'lucide-react';
 
 const FacultyStudents = () => {
@@ -18,7 +18,7 @@ const FacultyStudents = () => {
 
   const fetchStudents = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/students?search=${search}&semester=${semester}`);
+      const res = await api.get('/students', { params: { search, semester } });
       setStudents(res.data);
       setLoading(false);
     } catch (err) {
@@ -66,7 +66,9 @@ const FacultyStudents = () => {
               <span className="px-3 py-1 bg-gray-800 text-[10px] font-black text-gray-500 rounded-full uppercase tracking-widest">Sem {student.semester}</span>
             </div>
             
-            <h4 className="text-xl font-bold text-white mb-1">{student.first_name} {student.last_name}</h4>
+            <h4 className="text-xl font-bold text-white mb-1">
+              {student.name || [student.first_name, student.last_name].filter(Boolean).join(' ').trim() || '—'}
+            </h4>
             <p className="text-xs text-cems-blue font-bold font-mono uppercase mb-6 tracking-widest">{student.roll_no}</p>
 
             <div className="space-y-3 pt-6 border-t border-gray-800/50">

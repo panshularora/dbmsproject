@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { 
   Users, 
@@ -21,7 +21,7 @@ const FacultyDashboard = () => {
   useEffect(() => {
     const fetchEvals = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/faculty/${user.id}/evaluations`);
+        const res = await api.get(`/faculty/${user.id}/evaluations`);
         setEvaluations(res.data);
         setLoading(false);
       } catch (err) {
@@ -34,6 +34,10 @@ const FacultyDashboard = () => {
 
   const pending = evaluations.filter(e => e.status !== 'Graded').length;
   const graded = evaluations.filter(e => e.status === 'Graded').length;
+  const gradedMarks = evaluations.filter(e => e.marks != null && e.marks !== '');
+  const avgScore = gradedMarks.length
+    ? (gradedMarks.reduce((sum, e) => sum + Number(e.marks), 0) / gradedMarks.length).toFixed(1)
+    : '—';
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -95,7 +99,7 @@ const FacultyDashboard = () => {
             </div>
             <div>
               <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Avg Score</p>
-              <h4 className="text-3xl font-black text-white italic">78.5</h4>
+              <h4 className="text-3xl font-black text-white italic">{avgScore}</h4>
             </div>
           </div>
         </div>
