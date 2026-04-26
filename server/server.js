@@ -12,7 +12,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'srm_secret';
 
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['X-SQL-Query']
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -38,6 +40,29 @@ const requireRole = (role) => {
     next();
   };
 };
+
+// --- SQL Tracer ---
+let lastQuery = '';
+const originalQuery = db.query;
+db.query = async function(...args) {
+    lastQuery = args[0];
+    // Simple replacement of ? with values for display purposes
+    if (args[1]) {
+        args[1].forEach(val => {
+            lastQuery = lastQuery.replace('?', typeof val === 'string' ? `'${val}'` : val);
+        });
+    }
+    return originalQuery.apply(this, args);
+};
+
+app.use((req, res, next) => {
+    const originalJson = res.json;
+    res.json = function(data) {
+        res.setHeader('X-SQL-Query', lastQuery.replace(/\n/g, ' ').trim());
+        return originalJson.call(this, data);
+    };
+    next();
+});
 
 // --- Auth Endpoints ---
 
@@ -68,7 +93,8 @@ app.post('/api/auth/login', async (req, res) => {
         name: user.name || (user.first_name + ' ' + user.last_name),
         email: user.email,
         role,
-        semester: user.semester
+        semester: user.semester,
+        gpa: user.gpa || 0.00
       }
     });
   } catch (err) {
@@ -90,9 +116,12 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
     const [timelineSets] = await db.query('CALL GetDashboardTimeline(?)', [studentId]);
     const timeline = timelineSets[0];
 
+    const [[studentInfo]] = await db.query('SELECT gpa FROM students WHERE student_id = ?', [studentId]);
+
     res.json({
       registeredSubjects: registered,
       completedExams: completed,
+      gpa: studentInfo ? Number(studentInfo.gpa).toFixed(2) : '0.00',
       latestResult: latestResult[0] || null,
       timeline: timeline,
       notices: [
@@ -354,6 +383,52 @@ app.get('/api/analytics/subjects', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM vw_subject_analytics');
     res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/search (Global Full-Text Search)
+app.get('/api/search', authenticateToken, async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json({ students: [], subjects: [] });
+  
+  try {
+    const [students] = await db.query(
+      "SELECT student_id, name, roll_no, course FROM students WHERE MATCH(name, roll_no) AGAINST(? IN NATURAL LANGUAGE MODE)", 
+      [q]
+    );
+    const [subjects] = await db.query(
+      "SELECT subject_id, subject_name, credits FROM subjects WHERE MATCH(subject_name) AGAINST(? IN NATURAL LANGUAGE MODE)", 
+      [q]
+    );
+    res.json({ students, subjects });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/notifications/:studentId
+app.get('/api/notifications/:studentId', authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM notifications WHERE student_id = ? ORDER BY created_at DESC LIMIT 10', 
+      [req.params.studentId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/notifications/:id/read
+app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+  try {
+    await db.query('UPDATE notifications SET is_read = TRUE WHERE notification_id = ?', [req.params.id]);
+    res.json({ message: 'Notification marked as read' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

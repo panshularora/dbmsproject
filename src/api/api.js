@@ -13,4 +13,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Add a response interceptor to capture the SQL query header
+api.interceptors.response.use((response) => {
+  const sql = response.headers['x-sql-query'];
+  if (sql) {
+    window.dispatchEvent(new CustomEvent('sql-executed', { detail: sql }));
+  }
+  return response;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 export default api;

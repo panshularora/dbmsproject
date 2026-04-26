@@ -14,6 +14,8 @@ import {
   Search,
   ShieldAlert
 } from 'lucide-react';
+import GlobalSearch from './GlobalSearch';
+import NotificationBell from './NotificationBell';
 
 const StudentLayout = () => {
   const { logout, user } = useAuth();
@@ -99,23 +101,13 @@ const StudentLayout = () => {
       <div className="flex-1 ml-64 min-h-screen">
         {/* Top Navbar */}
         <header className="h-20 glass-sidebar border-b border-white/5 flex items-center justify-between px-10 sticky top-0 z-40">
-          <div className="relative w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search features, exams..." 
-              className="w-full bg-cems-bg/50 border border-white/5 rounded-2xl pl-12 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cems-purple/50 transition-all"
-            />
-          </div>
+          <GlobalSearch />
           <div className="flex items-center gap-6">
             <div className="flex gap-2">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Server Live</span>
             </div>
-            <button className="p-2.5 bg-cems-card border border-white/5 rounded-xl text-gray-400 hover:text-white transition-all relative group">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-cems-card"></span>
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

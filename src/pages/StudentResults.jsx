@@ -29,7 +29,10 @@ const StudentResults = () => {
     fetchResults();
   }, [user.id]);
 
-  const gpa = results.length > 0 && results[0].gpa ? Number(results[0].gpa).toFixed(2) : '0.00';
+  // GPA: prefer from API result (vw_student_results), then from user context (set at login), else 0.00
+  const gpa = (results.length > 0 && results[0].gpa)
+    ? Number(results[0].gpa).toFixed(2)
+    : (user?.gpa ? Number(user.gpa).toFixed(2) : '0.00');
 
   const handleDownloadPDF = () => {
     const doc = new jsPDF();

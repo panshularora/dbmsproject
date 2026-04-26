@@ -12,6 +12,7 @@ import SeatAllocation from './pages/SeatAllocation';
 import StudentResults from './pages/StudentResults';
 import Malpractice from './pages/Malpractice';
 import DatabaseSchema from './pages/DatabaseSchema';
+import QueryVisualizer from './components/QueryVisualizer';
 
 import FacultyLayout from './components/FacultyLayout';
 import FacultyDashboard from './pages/FacultyDashboard';
@@ -30,6 +31,7 @@ const App = () => {
   return (
     <AuthProvider>
       <Router>
+        <QueryVisualizer />
         <Routes>
           <Route path="/login" element={<Login />} />
           

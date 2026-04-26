@@ -150,6 +150,12 @@ const StudentDashboard = () => {
                   <p className="text-4xl font-black text-white transition-transform group-hover/stat:scale-110 duration-300">{data?.completedExams || 0}</p>
                   <p className="text-[10px] text-white/40 mt-1 font-bold">Grades published</p>
                 </div>
+                <div className="w-px h-16 bg-white/10"></div>
+                <div className="group/stat cursor-default">
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Current GPA</p>
+                  <p className="text-4xl font-black text-white transition-transform group-hover/stat:scale-110 duration-300">{data?.gpa || user?.gpa?.toFixed(2) || '—'}</p>
+                  <p className="text-[10px] text-white/40 mt-1 font-bold">Cumulative</p>
+                </div>
               </div>
               <motion.button 
                 whileHover={{ scale: 1.05, x: 5 }}

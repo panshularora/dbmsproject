@@ -8,8 +8,12 @@ import {
   LogOut,
   ShieldCheck,
   ShieldAlert,
-  Database
+  Database,
+  Search,
+  Bell
 } from 'lucide-react';
+import GlobalSearch from './GlobalSearch';
+import NotificationBell from './NotificationBell';
 
 const FacultyLayout = () => {
   const { logout, user } = useAuth();
@@ -79,8 +83,22 @@ const FacultyLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-10">
-        <Outlet />
+      <main className="flex-1 ml-64 min-h-screen">
+        {/* Top Navbar */}
+        <header className="h-20 bg-cems-sidebar/50 backdrop-blur-xl border-b border-gray-800 flex items-center justify-between px-10 sticky top-0 z-40">
+          <GlobalSearch />
+          <div className="flex items-center gap-6">
+            <div className="flex gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Faculty Mode</span>
+            </div>
+            <NotificationBell />
+          </div>
+        </header>
+
+        <div className="p-10">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

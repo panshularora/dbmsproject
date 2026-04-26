@@ -4,11 +4,11 @@ SELECT
     s.student_id,
     s.name AS student_name,
     s.roll_no,
+    s.gpa,
     sub.subject_name,
     sub.credits,
     e.marks,
-    e.grade,
-    s.gpa
+    e.grade
 FROM students s
 JOIN exam_registrations er ON s.student_id = er.student_id
 JOIN evaluations e ON er.registration_id = e.registration_id
