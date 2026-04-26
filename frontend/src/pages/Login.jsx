@@ -210,7 +210,7 @@ const Login = () => {
             <span>Secured Session Terminal</span>
             <span className="w-8 h-px bg-gray-800"></span>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
