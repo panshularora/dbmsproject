@@ -68,10 +68,20 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
       ORDER BY e.evaluation_id DESC LIMIT 1
     `, [studentId]);
 
+    const [timeline] = await db.query(`
+      SELECT sub.subject_name as subject, t.exam_date as date, t.exam_time as time
+      FROM exam_timetable t
+      JOIN subjects sub ON t.subject_id = sub.subject_id
+      JOIN exam_registrations er ON er.subject_id = t.subject_id
+      WHERE er.student_id = ?
+      ORDER BY t.exam_date ASC
+    `, [studentId]);
+
     res.json({
       registeredSubjects: registered,
       completedExams: completed,
       latestResult: latestResult[0] || null,
+      timeline: timeline,
       notices: [
         { title: 'End Semester Exams', content: 'Final exams start from May 12, 2025.' },
         { title: 'Hall Ticket Download', content: 'Download your hall tickets from the portal.' }

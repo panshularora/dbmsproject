@@ -90,7 +90,7 @@ const StudentResults = () => {
                   <th className="px-8 py-6 text-[10px] font-black text-gray-500 uppercase tracking-widest">Subject</th>
                   <th className="px-8 py-6 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Credits</th>
                   <th className="px-8 py-6 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Marks</th>
-                  <th className="px-8 py-6 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Grade</th>
+                  <th className="px-8 py-6 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Grade</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,8 +105,8 @@ const StudentResults = () => {
                       <span className="text-lg font-black text-white">{res.marks}</span>
                       <span className="text-xs text-gray-700">/100</span>
                     </td>
-                    <td className="px-8 py-6 text-right">
-                      <span className={`inline-block w-12 h-12 rounded-xl flex items-center justify-center font-black italic text-xl shadow-lg ${
+                    <td className="px-8 py-6 text-center">
+                      <span className={`inline-flex w-12 h-12 rounded-xl items-center justify-center font-black italic text-xl shadow-lg ${
                         res.grade === 'O' ? 'bg-green-500 text-white shadow-green-500/20' :
                         res.grade === 'A+' ? 'bg-cems-blue text-white shadow-blue-500/20' :
                         res.grade === 'A' ? 'bg-cems-purple text-white shadow-purple-500/20' :

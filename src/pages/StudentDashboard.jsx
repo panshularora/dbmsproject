@@ -184,28 +184,24 @@ const StudentDashboard = () => {
             </div>
             
             <div className="space-y-6 relative before:absolute before:left-[2.75rem] before:top-4 before:bottom-4 before:w-1 before:bg-gradient-to-b before:from-cems-blue before:via-cems-purple before:to-transparent">
-              {[
-                { subject: 'Database Management Systems', date: 'May 12, 2025', time: '10:00 AM', status: 'Core', color: 'blue' },
-                { subject: 'Theory of Computation', date: 'May 15, 2025', time: '02:00 PM', status: 'Major', color: 'purple' },
-                { subject: 'Web Technologies', date: 'May 18, 2025', time: '10:00 AM', status: 'Elective', color: 'pink' },
-              ].map((exam, i) => (
+              {data?.timeline && data.timeline.length > 0 ? data.timeline.map((exam, i) => (
                 <motion.div 
                   key={i}
                   whileHover={{ x: 10 }}
                   className="flex items-center gap-10 group cursor-pointer"
                 >
                   <div className={`w-24 h-24 rounded-3xl flex flex-col items-center justify-center shrink-0 z-10 border-8 border-cems-bg transition-all duration-500 bg-cems-card group-hover:scale-110 shadow-xl`}>
-                    <span className="text-[10px] font-black text-gray-500 uppercase">{exam.date.split(' ')[0]}</span>
-                    <span className="text-3xl font-black text-white italic leading-none">{exam.date.split(' ')[1].replace(',', '')}</span>
+                    <span className="text-[10px] font-black text-gray-500 uppercase">{new Date(exam.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                    <span className="text-3xl font-black text-white italic leading-none">{new Date(exam.date).getDate()}</span>
                   </div>
                   <div className="bg-white/2 p-8 rounded-[2.5rem] border border-white/5 flex-1 transition-all duration-500 hover:bg-white/5 hover:border-white/20">
                     <div className="flex justify-between items-start mb-3">
                       <h4 className="text-lg font-bold text-white group-hover:text-cems-blue transition-colors">{exam.subject}</h4>
-                      <span className={`px-3 py-1 bg-white/5 text-gray-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-white/10`}>{exam.status}</span>
+                      <span className={`px-3 py-1 bg-white/5 text-gray-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-white/10`}>Core</span>
                     </div>
                     <div className="flex gap-6">
                       <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Calendar size={14} className="text-cems-blue" /> {exam.date}
+                        <Calendar size={14} className="text-cems-blue" /> {new Date(exam.date).toLocaleDateString()}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Clock size={14} className="text-cems-purple" /> {exam.time}
@@ -213,7 +209,9 @@ const StudentDashboard = () => {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+              )) : (
+                <div className="p-10 text-center text-gray-600 italic">No exams scheduled for your registrations.</div>
+              )}
             </div>
           </motion.div>
         </div>
