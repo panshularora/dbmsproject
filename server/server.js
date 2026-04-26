@@ -1,4 +1,5 @@
-require('dotenv').config({ path: '../.env' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -20,7 +21,7 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password, role } = req.body;
   try {
     const table = role === 'faculty' ? 'faculty' : 'students';
-    const idField = role === 'faculty' ? 'faculty_id' : 'roll_no';
+    const idField = role === 'faculty' ? 'faculty_id' : 'student_id';
     
     // In normalized MySQL, we'll look for the user in their respective table
     const [users] = await db.query(`SELECT * FROM ${table} WHERE email = ?`, [email]);
@@ -38,6 +39,7 @@ app.post('/api/auth/login', async (req, res) => {
       token,
       user: {
         id: user[idField],
+        roll_no: user.roll_no,
         name: user.name || (user.first_name + ' ' + user.last_name),
         email: user.email,
         role,
@@ -53,18 +55,18 @@ app.post('/api/auth/login', async (req, res) => {
 // GET /api/students/:id/dashboard
 app.get('/api/students/:id/dashboard', async (req, res) => {
   try {
-    const rollNo = req.params.id;
+    const studentId = req.params.id; // This is the INT student_id now
     
-    // Aggregate data
-    const [[{ count: registered }]] = await db.query('SELECT COUNT(*) as count FROM exam_registrations WHERE roll_no = ?', [rollNo]);
-    const [[{ count: completed }]] = await db.query('SELECT COUNT(*) as count FROM evaluations WHERE roll_no = ?', [rollNo]);
+    const [[{ count: registered }]] = await db.query('SELECT COUNT(*) as count FROM exam_registrations WHERE student_id = ?', [studentId]);
+    const [[{ count: completed }]] = await db.query('SELECT COUNT(*) as count FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
     const [latestResult] = await db.query(`
       SELECT sub.subject_name, e.marks, e.grade 
       FROM evaluations e 
-      JOIN subjects sub ON e.subject_code = sub.subject_code 
-      WHERE e.roll_no = ? 
+      JOIN exam_registrations er ON e.registration_id = er.registration_id
+      JOIN subjects sub ON er.subject_id = sub.subject_id 
+      WHERE er.student_id = ? 
       ORDER BY e.evaluation_id DESC LIMIT 1
-    `, [rollNo]);
+    `, [studentId]);
 
     res.json({
       registeredSubjects: registered,
@@ -111,9 +113,10 @@ app.get('/api/results/:studentId', async (req, res) => {
     const sql = `
       SELECT s.name, sub.subject_name, e.marks, e.grade
       FROM students s
-      JOIN evaluations e ON s.roll_no = e.roll_no
-      JOIN subjects sub ON e.subject_code = sub.subject_code
-      WHERE s.roll_no = ?
+      JOIN exam_registrations er ON s.student_id = er.student_id
+      JOIN evaluations e ON er.registration_id = e.registration_id
+      JOIN subjects sub ON er.subject_id = sub.subject_id
+      WHERE s.student_id = ?
     `;
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows);
@@ -129,7 +132,7 @@ app.get('/api/timetable', async (req, res) => {
     const sql = `
       SELECT sub.subject_name, t.exam_date, t.exam_time
       FROM exam_timetable t
-      JOIN subjects sub ON t.subject_code = sub.subject_code
+      JOIN subjects sub ON t.subject_id = sub.subject_id
     `;
     const [rows] = await db.query(sql);
     res.json(rows);
@@ -146,7 +149,8 @@ app.get('/api/hall/:studentId', async (req, res) => {
       SELECT h.hall_name, ha.seat_no
       FROM hall_allocations ha
       JOIN exam_halls h ON ha.hall_id = h.hall_id
-      WHERE ha.roll_no = ?
+      JOIN students s ON ha.roll_no = s.roll_no
+      WHERE s.student_id = ?
     `;
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows[0] || { message: 'No allocation found' });
@@ -160,7 +164,8 @@ app.get('/api/hall/:studentId', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { student_id, subject_id } = req.body;
   try {
-    const sql = 'INSERT INTO exam_registrations (roll_no, subject_code) VALUES (?, ?)';
+    // We need an exam_id. We'll default to 1 as per examinations table check.
+    const sql = 'INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, 1)';
     const [result] = await db.query(sql, [student_id, subject_id]);
     res.json({ message: 'Registration successful', id: result.insertId });
   } catch (err) {
