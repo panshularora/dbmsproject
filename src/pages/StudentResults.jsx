@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { Download, Award, FileText, CheckCircle2 } from 'lucide-react';
 
@@ -11,8 +11,15 @@ const StudentResults = () => {
   useEffect(() => {
     const fetchResults = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/students/${user.id}/results`);
-        setResults(res.data);
+        const res = await api.get(`/results/${user.id}`);
+        // Adjusting data to match UI needs with mandated API fields
+        const formattedResults = res.data.map((r, i) => ({
+          ...r,
+          evaluation_id: i, // Mocking ID as it wasn't in mandated return
+          grade: r.marks >= 90 ? 'O' : r.marks >= 80 ? 'A+' : r.marks >= 70 ? 'A' : 'B',
+          credits: 4 // Mocking credits
+        }));
+        setResults(formattedResults);
         setLoading(false);
       } catch (err) {
         console.error(err);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, User, CheckCircle2, Navigation, Info, Shield } from 'lucide-react';
@@ -12,7 +12,7 @@ const SeatAllocation = () => {
   useEffect(() => {
     const fetchSeat = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/students/${user.id}/seat`);
+        const res = await api.get(`/hall/${user.id}`);
         setAllocation(res.data);
         setLoading(false);
       } catch (err) {

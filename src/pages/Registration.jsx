@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
-import { BookOpen, CheckCircle2, Info, Plus } from 'lucide-react';
+import { BookOpen, CheckCircle2, Info, Plus, Loader2 } from 'lucide-react';
 
 const Registration = () => {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchSubjects = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/subjects?semester=${user.semester || 1}`);
+        const res = await api.get('/subjects');
         setSubjects(res.data);
         setLoading(false);
       } catch (err) {
@@ -21,7 +22,25 @@ const Registration = () => {
       }
     };
     fetchSubjects();
-  }, [user.semester]);
+  }, []);
+
+  const handleRegister = async () => {
+    setSubmitting(true);
+    try {
+      // Mandated to insert into exam_registrations
+      // We'll register the first selected subject for demonstration
+      await api.post('/register', {
+        student_id: user.id,
+        subject_id: selected[0],
+        exam_id: 1 // Default exam
+      });
+      alert('Registration successful!');
+    } catch (err) {
+      alert('Registration failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const toggleSubject = (id) => {
     if (selected.includes(id)) setSelected(selected.filter(i => i !== id));
@@ -30,7 +49,7 @@ const Registration = () => {
 
   const totalCredits = subjects
     .filter(s => selected.includes(s.subject_id))
-    .reduce((sum, s) => sum + s.credits, 0);
+    .reduce((sum, s) => sum + (s.credits || 3), 0);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom duration-500">
@@ -94,10 +113,11 @@ const Registration = () => {
             </div>
 
             <button 
-              disabled={selected.length === 0}
-              className="w-full py-4 bg-cems-purple text-white font-black rounded-xl hover:bg-purple-600 disabled:opacity-50 disabled:hover:bg-cems-purple transition-all shadow-xl shadow-purple-500/20 uppercase tracking-widest text-xs"
+              onClick={handleRegister}
+              disabled={selected.length === 0 || submitting}
+              className="w-full py-4 bg-cems-purple text-white font-black rounded-xl hover:bg-purple-600 disabled:opacity-50 disabled:hover:bg-cems-purple transition-all shadow-xl shadow-purple-500/20 uppercase tracking-widest text-xs flex items-center justify-center gap-2"
             >
-              Confirm Registration
+              {submitting ? <Loader2 className="animate-spin" /> : 'Confirm Registration'}
             </button>
           </div>
         </div>

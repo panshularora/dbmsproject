@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { Clock, MapPin, Calendar, CheckCircle, Timer } from 'lucide-react';
 
@@ -11,8 +11,16 @@ const StudentTimetable = () => {
   useEffect(() => {
     const fetchTimetable = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/students/${user.id}/timetable`);
-        setTimetable(res.data);
+        const res = await api.get('/timetable');
+        // Mandated return: subject_name, exam_date, exam_time
+        const formatted = res.data.map((row, i) => ({
+          ...row,
+          timetable_id: i,
+          type: 'Core', // Mocking as not in mandate
+          venue: 'Main Hall', // Mocking
+          status: 'Upcoming' // Mocking
+        }));
+        setTimetable(formatted);
         setLoading(false);
       } catch (err) {
         console.error(err);

@@ -1,46 +1,39 @@
-# College Examination Management System API
+# SRM Exam Portal (MySQL Edition)
 
-A Node.js + Express backend with SQLite database for managing college examinations.
+A high-fidelity examination management system refactored for MySQL and Express.
 
-## Setup
+## 📁 Project Structure
+- `/src`: Frontend React (Vite) source code.
+- `/server`: Node.js + Express backend.
+- `/public`: Static assets for the frontend.
+- `.env`: Environment configuration for DB and JWT.
 
-1.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
+## 🚀 Getting Started
 
-2.  **Seed the database**:
-    The database is automatically initialized and seeded on first run, but you can also run it manually:
-    ```bash
-    node seed.js
-    ```
+### 1. Database Setup
+Ensure MySQL is running and an `exam_db` database exists with the normalized schema. Update the `.env` file with your MySQL credentials:
+```env
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=exam_db
+```
 
-3.  **Start the server**:
-    ```bash
-    node server.js
-    ```
-    The server will run on `http://localhost:3000`.
+### 2. Install Dependencies
+Run from the root:
+```bash
+npm install
+cd server
+npm install
+```
 
-## API Endpoints
+### 3. Run the Application
+- **Frontend**: `npm run dev` (Runs on http://localhost:5173)
+- **Backend**: `npm run server` (Runs on http://localhost:5000)
 
-### CRUD Endpoints
-Available for: `students`, `subjects`, `examinations`, `registrations`, `timetable`, `halls`, `allocations`, `faculty`, `evaluations`, `malpractice`.
-
--   `GET /api/:resource` - List all (supports query filtering, e.g., `?semester=1` or `?limit=10`)
--   `GET /api/:resource/:id` - Get by ID
--   `POST /api/:resource` - Create new
--   `PUT /api/:resource/:id` - Update
--   `DELETE /api/:resource/:id` - Delete
-
-### Aggregate & Search Endpoints
-
--   `GET /api/results/summary` - Statistical summary of results per subject.
--   `GET /api/students/topper?limit=10` - List top performing students.
--   `GET /api/results/gradesheet/:studentId` - Detailed gradesheet for a specific student.
-
-## Technologies Used
--   **Node.js & Express**: Web framework.
--   **SQLite (better-sqlite3)**: Database engine.
--   **xlsx**: Excel data parsing.
--   **cors**: Cross-Origin Resource Sharing.
--   **morgan**: HTTP request logger.
+## 📡 API Endpoints
+- `GET /api/students`: All students.
+- `GET /api/results/:studentId`: Joined result data.
+- `GET /api/timetable`: Full exam schedule.
+- `GET /api/hall/:studentId`: Seat allocation details.
+- `POST /api/register`: Register for exams.
