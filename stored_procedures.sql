@@ -123,4 +123,30 @@ BEGIN
     COMMIT;
 END //
 
+DROP PROCEDURE IF EXISTS GetFacultyInfo //
+CREATE PROCEDURE GetFacultyInfo(IN p_faculty_id INT)
+BEGIN
+    SELECT faculty_id, name, email, department FROM faculty WHERE faculty_id = p_faculty_id;
+END //
+
+DROP PROCEDURE IF EXISTS GetAllMalpractice //
+CREATE PROCEDURE GetAllMalpractice()
+BEGIN
+    SELECT m.*, s.name AS student_name, sub.subject_name
+    FROM malpractice m
+    JOIN exam_registrations er ON m.registration_id = er.registration_id
+    JOIN students s ON er.student_id = s.student_id
+    JOIN subjects sub ON er.subject_id = sub.subject_id;
+END //
+
+DROP PROCEDURE IF EXISTS PublishResult //
+CREATE PROCEDURE PublishResult(IN p_registration_id INT, IN p_marks DECIMAL(5,2))
+BEGIN
+    DECLARE v_faculty_id INT DEFAULT 1; -- Defaulting for demo
+    
+    INSERT INTO evaluations (registration_id, faculty_id, marks)
+    VALUES (p_registration_id, v_faculty_id, p_marks)
+    ON DUPLICATE KEY UPDATE marks = p_marks;
+END //
+
 DELIMITER ;

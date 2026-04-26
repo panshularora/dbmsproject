@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const db = require('./db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -14,6 +15,29 @@ const JWT_SECRET = process.env.JWT_SECRET || 'srm_secret';
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+
+// --- Middleware ---
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
+const requireRole = (role) => {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== role) {
+      return res.status(403).json({ error: 'Access denied: Insufficient permissions' });
+    }
+    next();
+  };
+};
 
 // --- Auth Endpoints ---
 
@@ -33,7 +57,8 @@ app.post('/api/auth/login', async (req, res) => {
     
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
     
-    const token = jwt.sign({ id: user[idField], role }, JWT_SECRET, { expiresIn: '24h' });
+    // Include role and id in the JWT payload
+    const token = jwt.sign({ id: user[idField], role: role }, JWT_SECRET, { expiresIn: '24h' });
     
     res.json({
       token,
@@ -175,8 +200,8 @@ app.get('/api/hall/:studentId', async (req, res) => {
 
 // --- Demo Endpoints ---
 
-// POST /api/demo/caught/:id
-app.post('/api/demo/caught/:id', async (req, res) => {
+// POST /api/demo/caught/:id (Secured)
+app.post('/api/demo/caught/:id', authenticateToken, requireRole('faculty'), async (req, res) => {
   try {
     const studentId = req.params.id;
     const [[registration]] = await db.query(`
@@ -206,8 +231,8 @@ app.post('/api/demo/caught/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/demo/reset/:id
-app.post('/api/demo/reset/:id', async (req, res) => {
+// DELETE /api/demo/reset/:id (Secured)
+app.post('/api/demo/reset/:id', authenticateToken, requireRole('faculty'), async (req, res) => {
   try {
     const studentId = req.params.id;
     
@@ -221,8 +246,57 @@ app.post('/api/demo/reset/:id', async (req, res) => {
   }
 });
 
+// GET /api/faculty/:id
+app.get('/api/faculty/:id', authenticateToken, async (req, res) => {
+  try {
+    const [resultSets] = await db.query('CALL GetFacultyInfo(?)', [req.params.id]);
+    res.json(resultSets[0][0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/malpractice (All records - Faculty only)
+app.get('/api/malpractice', authenticateToken, requireRole('faculty'), async (req, res) => {
+  try {
+    const [resultSets] = await db.query('CALL GetAllMalpractice()');
+    res.json(resultSets[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/results/publish (Faculty only)
+app.put('/api/results/publish', [
+  authenticateToken,
+  requireRole('faculty'),
+  body('registration_id').isInt(),
+  body('marks').isFloat({ min: 0, max: 100 })
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  const { registration_id, marks } = req.body;
+  try {
+    await db.query('CALL PublishResult(?, ?)', [registration_id, marks]);
+    res.json({ message: 'Result published successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/register
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', [
+  authenticateToken,
+  body('student_id').isInt(),
+  body('subject_id').isInt()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
   const { student_id, subject_id } = req.body;
   try {
     // 1. Register for Exam via Stored Procedure
