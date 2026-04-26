@@ -63,32 +63,44 @@ const Registration = () => {
 
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {subjects.map((subject) => (
-              <div 
-                key={subject.subject_id}
-                onClick={() => toggleSubject(subject.subject_id)}
-                className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all ${
-                  selected.includes(subject.subject_id)
-                    ? 'bg-cems-purple/10 border-cems-purple shadow-xl shadow-purple-500/10'
-                    : 'bg-cems-card border-gray-800 hover:border-gray-700'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`p-3 rounded-xl ${selected.includes(subject.subject_id) ? 'bg-cems-purple text-white' : 'bg-gray-800 text-gray-400'}`}>
-                    <BookOpen size={20} />
-                  </div>
-                  {selected.includes(subject.subject_id) && <CheckCircle2 className="text-cems-purple" />}
-                </div>
-                <h4 className="font-bold text-white mb-1">{subject.subject_name}</h4>
-                <p className="text-xs text-gray-500 mb-4">{subject.subject_code}</p>
-                <div className="flex justify-between items-center pt-4 border-t border-gray-800/50">
-                  <span className="text-[10px] font-black uppercase text-gray-600 tracking-widest">{subject.type || 'Core'}</span>
-                  <span className="px-3 py-1 bg-cems-bg rounded-full text-xs font-bold text-white">{subject.credits} Credits</span>
+            {Object.entries(
+              subjects.reduce((acc, subject) => {
+                const sem = subject.semester || 'Other';
+                if (!acc[sem]) acc[sem] = [];
+                acc[sem].push(subject);
+                return acc;
+              }, {})
+            ).map(([semester, semsSubjects]) => (
+              <div key={semester} className="mb-8 col-span-full">
+                <h3 className="text-xl font-bold text-white mb-4 border-b border-gray-800 pb-2">Semester {semester}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {semsSubjects.map((subject) => (
+                    <div 
+                      key={subject.subject_id}
+                      onClick={() => toggleSubject(subject.subject_id)}
+                      className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all ${
+                        selected.includes(subject.subject_id)
+                          ? 'bg-cems-purple/10 border-cems-purple shadow-xl shadow-purple-500/10'
+                          : 'bg-cems-card border-gray-800 hover:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={`p-3 rounded-xl ${selected.includes(subject.subject_id) ? 'bg-cems-purple text-white' : 'bg-gray-800 text-gray-400'}`}>
+                          <BookOpen size={20} />
+                        </div>
+                        {selected.includes(subject.subject_id) && <CheckCircle2 className="text-cems-purple" />}
+                      </div>
+                      <h4 className="font-bold text-white mb-1">{subject.subject_name}</h4>
+                      <p className="text-xs text-gray-500 mb-4">{subject.subject_code || `SUB-${subject.subject_id}`}</p>
+                      <div className="flex justify-between items-center pt-4 border-t border-gray-800/50">
+                        <span className="text-[10px] font-black uppercase text-gray-600 tracking-widest">{subject.type || 'Core'}</span>
+                        <span className="px-3 py-1 bg-cems-bg rounded-full text-xs font-bold text-white">{subject.credits} Credits</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
-          </div>
         </div>
 
         {/* Sidebar Summary */}

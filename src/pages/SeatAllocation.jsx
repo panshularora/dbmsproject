@@ -3,7 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, User, CheckCircle2, Navigation, Info, Shield, ChevronDown } from 'lucide-react';
+import { MapPin, User, CheckCircle2, Navigation, Info, Shield, ChevronDown, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const SeatAllocation = () => {
   const { user } = useAuth();
@@ -47,6 +49,22 @@ const SeatAllocation = () => {
 
   const mySeatString = getSeatString(allocation?.seat_no);
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text('SRM Institute of Science and Technology', 14, 22);
+    doc.setFontSize(14);
+    doc.text('Seat Allocation Detail', 14, 32);
+    
+    doc.setFontSize(12);
+    doc.text(`Student ID: ${user?.id}`, 14, 45);
+    doc.text(`Subject: ${allocation?.subject_name || 'N/A'}`, 14, 52);
+    doc.text(`Hall: ${allocation?.hall_name || 'N/A'}`, 14, 59);
+    doc.text(`Seat Number: ${mySeatString}`, 14, 66);
+    
+    doc.save(`SRM_Seat_Allocation_${user?.id}_${allocation?.subject_id}.pdf`);
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-12 h-12 border-4 border-cems-blue border-t-transparent rounded-full animate-spin"></div>
@@ -80,9 +98,17 @@ const SeatAllocation = () => {
             )}
           </div>
         </div>
-        <div className="p-4 glass-card rounded-2xl border border-white/5 flex items-center gap-3">
-          <Shield className="text-green-500" size={20} />
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Secure Zone</span>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleDownloadPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-gray-700 transition-all"
+          >
+            <Download size={14} /> Download
+          </button>
+          <div className="p-4 glass-card rounded-2xl border border-white/5 flex items-center gap-3">
+            <Shield className="text-green-500" size={20} />
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Secure Zone</span>
+          </div>
         </div>
       </motion.header>
 

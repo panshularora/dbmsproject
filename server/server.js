@@ -69,10 +69,15 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
     `, [studentId]);
 
     const [timeline] = await db.query(`
-      SELECT sub.subject_name as subject, t.exam_date as date, t.exam_time as time
+      SELECT 
+        sub.subject_code, sub.subject_name as subject, 
+        t.exam_date as date, t.exam_time as time,
+        h.hall_name, ha.seat_no
       FROM exam_timetable t
       JOIN subjects sub ON t.subject_id = sub.subject_id
       JOIN exam_registrations er ON er.subject_id = t.subject_id
+      LEFT JOIN hall_allocations ha ON ha.registration_id = er.registration_id
+      LEFT JOIN halls h ON ha.hall_id = h.hall_id
       WHERE er.student_id = ?
       ORDER BY t.exam_date ASC
     `, [studentId]);

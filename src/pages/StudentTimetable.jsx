@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
-import { Clock, MapPin, Calendar, CheckCircle, Timer } from 'lucide-react';
+import { Clock, MapPin, Calendar, CheckCircle, Timer, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const StudentTimetable = () => {
   const { user } = useAuth();
@@ -32,11 +34,50 @@ const StudentTimetable = () => {
     fetchTimetable();
   }, [user.id]);
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text('SRM Institute of Science and Technology', 14, 22);
+    doc.setFontSize(14);
+    doc.text('Examination Timetable', 14, 32);
+    
+    doc.setFontSize(12);
+    doc.text(`Student ID: ${user?.id}`, 14, 45);
+    doc.text(`Semester: ${user?.semester || 1}`, 14, 52);
+
+    const tableData = timetable.map(row => [
+      row.subject_code || `SUB-${row.subject_id}`,
+      row.subject_name,
+      new Date(row.exam_date).toLocaleDateString(),
+      row.exam_time,
+      row.venue
+    ]);
+
+    doc.autoTable({
+      startY: 60,
+      head: [['Code', 'Subject', 'Date', 'Time', 'Venue']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+
+    doc.save(`SRM_Timetable_${user?.id}.pdf`);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <header>
-        <h1 className="text-3xl font-black text-white mb-2">Examination Timetable</h1>
-        <p className="text-gray-500 font-medium italic">Your personalized exam schedule for Semester {user?.semester || 1}. Click on a subject to see seat allocation.</p>
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-black text-white mb-2">Examination Timetable</h1>
+          <p className="text-gray-500 font-medium italic">Your personalized exam schedule for Semester {user?.semester || 1}. Click on a subject to see seat allocation.</p>
+        </div>
+        <button 
+          onClick={handleDownloadPDF}
+          className="flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-all"
+        >
+          <Download size={18} /> Download Schedule
+        </button>
       </header>
 
       <div className="bg-cems-card rounded-[2.5rem] border border-gray-800 overflow-hidden shadow-2xl">

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { Download, Award, FileText, CheckCircle2 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const StudentResults = () => {
   const { user } = useAuth();
@@ -36,6 +38,38 @@ const StudentResults = () => {
       }, 0) / results.length).toFixed(2)
     : '0.00';
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text('SRM Institute of Science and Technology', 14, 22);
+    doc.setFontSize(14);
+    doc.text('Official Grade Sheet', 14, 32);
+    
+    doc.setFontSize(12);
+    doc.text(`Student ID: ${user?.id}`, 14, 45);
+    doc.text(`Semester: ${user?.semester || 1}`, 14, 52);
+    doc.text(`Current GPA: ${gpa}`, 14, 59);
+
+    const tableData = results.map(r => [
+      r.subject_code || `SUB-${r.subject_id}`,
+      r.subject_name,
+      r.credits,
+      r.marks,
+      r.grade
+    ]);
+
+    doc.autoTable({
+      startY: 70,
+      head: [['Code', 'Subject', 'Credits', 'Marks', 'Grade']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+
+    doc.save(`SRM_Grade_Sheet_${user?.id}.pdf`);
+  };
+
   return (
     <div className="space-y-8 animate-in slide-in-from-right duration-500">
       <header className="flex justify-between items-end">
@@ -43,7 +77,10 @@ const StudentResults = () => {
           <h1 className="text-3xl font-black text-white mb-2">Grade Sheet</h1>
           <p className="text-gray-500 font-medium italic">Consolidated academic performance report.</p>
         </div>
-        <button className="flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-all">
+        <button 
+          onClick={handleDownloadPDF}
+          className="flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-all"
+        >
           <Download size={18} /> Download PDF
         </button>
       </header>

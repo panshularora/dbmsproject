@@ -10,9 +10,12 @@ import {
   MapPin, 
   CheckCircle2,
   TrendingUp,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const StudentDashboard = () => {
   const { user } = useAuth();
@@ -33,6 +36,61 @@ const StudentDashboard = () => {
     };
     fetchData();
   }, [user.id]);
+
+  const handleDownloadHallTicket = () => {
+    if (!data?.timeline || data.timeline.length === 0) {
+      alert("No registered subjects found for Hall Ticket.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.text('SRM Institute of Science and Technology', 14, 22);
+    doc.setFontSize(16);
+    doc.text('OFFICIAL HALL TICKET', 14, 32);
+    
+    doc.setFontSize(12);
+    doc.text(`Student ID: ${user?.id}`, 14, 45);
+    doc.text(`Name: ${user?.name || 'Student Name'}`, 14, 52);
+    doc.text(`Semester: ${user?.semester || 1}`, 14, 59);
+
+    const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    const getSeatString = (seatNo) => {
+      if (!seatNo) return 'TBA';
+      const num = parseInt(seatNo, 10);
+      if (isNaN(num)) return seatNo;
+      const rIndex = Math.floor((num - 1) / 10);
+      const c = ((num - 1) % 10) + 1;
+      const r = rows[rIndex] || 'X';
+      return `${r}${c}`;
+    };
+
+    const tableData = data.timeline.map(row => [
+      row.subject_code || `SUB`,
+      row.subject,
+      new Date(row.date).toLocaleDateString(),
+      row.time,
+      row.hall_name || 'TBA',
+      getSeatString(row.seat_no)
+    ]);
+
+    doc.autoTable({
+      startY: 70,
+      head: [['Code', 'Subject', 'Date', 'Time', 'Hall', 'Seat']],
+      body: tableData,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+
+    doc.setFontSize(10);
+    const finalY = doc.lastAutoTable.finalY || 150;
+    doc.text('Instructions:', 14, finalY + 15);
+    doc.text('1. Bring this Hall Ticket and ID Card to the exam hall.', 14, finalY + 22);
+    doc.text('2. Arrive at least 15 minutes before the exam starts.', 14, finalY + 29);
+
+    doc.save(`SRM_HallTicket_${user?.id}.pdf`);
+  };
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -177,9 +235,13 @@ const StudentDashboard = () => {
                 </div>
                 Schedule Timeline
               </h3>
-              <div className="flex gap-2">
-                <span className="w-2 h-2 bg-cems-blue rounded-full"></span>
-                <span className="w-2 h-2 bg-gray-800 rounded-full"></span>
+              <div className="flex gap-4 items-center">
+                <button 
+                  onClick={handleDownloadHallTicket}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cems-blue to-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-blue-500/20"
+                >
+                  <Download size={14} /> Download Hall Ticket
+                </button>
               </div>
             </div>
             
