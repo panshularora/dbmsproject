@@ -7,7 +7,8 @@ import {
   Edit3,
   LogOut,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Database
 } from 'lucide-react';
 
 const FacultyLayout = () => {
@@ -24,6 +25,7 @@ const FacultyLayout = () => {
     { name: 'Evaluations', path: '/faculty/evaluations', icon: <Edit3 size={20} /> },
     { name: 'Students', path: '/faculty/students', icon: <Users size={20} /> },
     { name: 'Malpractice', path: '/faculty/malpractice', icon: <ShieldAlert size={20} /> },
+    { name: 'Database', path: '/faculty/database', icon: <Database size={20} /> },
   ];
 
   return (

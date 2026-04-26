@@ -211,11 +211,8 @@ app.post('/api/demo/reset/:id', async (req, res) => {
   try {
     const studentId = req.params.id;
     
-    // Delete in reverse order of dependencies
-    await db.query('DELETE m FROM malpractice m JOIN exam_registrations er ON m.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
-    await db.query('DELETE e FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
-    await db.query('DELETE ha FROM hall_allocations ha JOIN exam_registrations er ON ha.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
-    await db.query('DELETE FROM exam_registrations WHERE student_id = ?', [studentId]);
+    // Delete in reverse order of dependencies via transaction-wrapped stored procedure
+    await db.query('CALL ResetDemoData(?)', [studentId]);
     
     res.json({ message: 'Demo data reset successfully' });
   } catch (err) {
@@ -257,6 +254,32 @@ app.post('/api/demo/evaluate/:id', async (req, res) => {
     }
     
     res.json({ message: 'Mock evaluations completed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/explain
+app.post('/api/explain', async (req, res) => {
+  const { query } = req.body;
+  try {
+    if (!query.toLowerCase().trim().startsWith('select')) {
+      return res.status(400).json({ error: 'Only SELECT queries are allowed.' });
+    }
+    const [rows] = await db.query(`EXPLAIN ${query}`);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/analytics/subjects
+app.get('/api/analytics/subjects', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM vw_subject_analytics');
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

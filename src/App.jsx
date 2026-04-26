@@ -11,6 +11,7 @@ import StudentTimetable from './pages/StudentTimetable';
 import SeatAllocation from './pages/SeatAllocation';
 import StudentResults from './pages/StudentResults';
 import Malpractice from './pages/Malpractice';
+import DatabaseSchema from './pages/DatabaseSchema';
 
 import FacultyLayout from './components/FacultyLayout';
 import FacultyDashboard from './pages/FacultyDashboard';
@@ -48,6 +49,7 @@ const App = () => {
             <Route path="evaluations" element={<FacultyEvaluations />} />
             <Route path="students" element={<FacultyStudents />} />
             <Route path="malpractice" element={<FacultyMalpractice />} />
+            <Route path="database" element={<DatabaseSchema />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/login" />} />

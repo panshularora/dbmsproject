@@ -14,12 +14,10 @@ const StudentResults = () => {
     const fetchResults = async () => {
       try {
         const res = await api.get(`/results/${user.id}`);
-        // Adjusting data to match UI needs with mandated API fields
+        // Now fetching real computed grades and GPA from the database
         const formattedResults = res.data.map((r, i) => ({
           ...r,
-          evaluation_id: i, // Mocking ID as it wasn't in mandated return
-          grade: r.marks >= 90 ? 'O' : r.marks >= 80 ? 'A+' : r.marks >= 70 ? 'A' : 'B',
-          credits: 4 // Mocking credits
+          evaluation_id: i, // Fallback if no ID is returned
         }));
         setResults(formattedResults);
         setLoading(false);
@@ -31,12 +29,7 @@ const StudentResults = () => {
     fetchResults();
   }, [user.id]);
 
-  const gpa = results.length > 0 
-    ? (results.reduce((acc, r) => {
-        const gradeMap = { 'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'F': 0 };
-        return acc + (gradeMap[r.grade] || 0);
-      }, 0) / results.length).toFixed(2)
-    : '0.00';
+  const gpa = results.length > 0 && results[0].gpa ? Number(results[0].gpa).toFixed(2) : '0.00';
 
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
