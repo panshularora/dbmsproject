@@ -154,6 +154,20 @@ const StudentDashboard = () => {
               >
                 Mock Results
               </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    await api.post(`/demo/caught/${user.id}`);
+                    alert('You have been CAUGHT cheating! Check the Malpractice section.');
+                    window.location.reload();
+                  } catch (err) {
+                    alert(err.response?.data?.error || 'Failed to trigger demo');
+                  }
+                }}
+                className="px-4 py-2 bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-orange-500/20 transition-all"
+              >
+                Simulate Malpractice
+              </button>
             </div>
           </div>
             <div className="flex justify-between items-center mb-10">

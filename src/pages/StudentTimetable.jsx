@@ -11,7 +11,7 @@ const StudentTimetable = () => {
   useEffect(() => {
     const fetchTimetable = async () => {
       try {
-        const res = await api.get('/timetable');
+        const res = await api.get(`/timetable/${user.id}`);
         // Mandated return: subject_name, exam_date, exam_time
         const formatted = res.data.map((row, i) => ({
           ...row,

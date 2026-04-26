@@ -126,15 +126,45 @@ app.get('/api/results/:studentId', async (req, res) => {
   }
 });
 
+// GET /api/timetable/:studentId (Personalized)
+app.get('/api/timetable/:studentId', async (req, res) => {
+  try {
+    const studentId = req.params.studentId;
+    const sql = `
+      SELECT sub.subject_name, sub.subject_id, t.exam_date, t.exam_time
+      FROM exam_timetable t
+      JOIN subjects sub ON t.subject_id = sub.subject_id
+      JOIN exam_registrations er ON sub.subject_id = er.subject_id
+      WHERE er.student_id = ?
+    `;
+    const [rows] = await db.query(sql, [studentId]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/timetable
 app.get('/api/timetable', async (req, res) => {
   try {
     const sql = `
-      SELECT sub.subject_name, t.exam_date, t.exam_time
+      SELECT sub.subject_name, sub.subject_id, t.exam_date, t.exam_time
       FROM exam_timetable t
       JOIN subjects sub ON t.subject_id = sub.subject_id
     `;
     const [rows] = await db.query(sql);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/malpractice/:roll_no
+app.get('/api/malpractice/:roll_no', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM malpractice WHERE roll_no = ?', [req.params.roll_no]);
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -149,8 +179,8 @@ app.get('/api/hall/:studentId', async (req, res) => {
       SELECT h.hall_name, ha.seat_no
       FROM hall_allocations ha
       JOIN exam_halls h ON ha.hall_id = h.hall_id
-      JOIN students s ON ha.roll_no = s.roll_no
-      WHERE s.student_id = ?
+      JOIN exam_registrations er ON ha.registration_id = er.registration_id
+      WHERE er.student_id = ?
     `;
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows[0] || { message: 'No allocation found' });
@@ -182,13 +212,50 @@ app.post('/api/register', async (req, res) => {
 
 // --- Demo Endpoints ---
 
+// POST /api/demo/caught/:id
+app.post('/api/demo/caught/:id', async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const [[student]] = await db.query('SELECT roll_no, name, semester FROM students WHERE student_id = ?', [studentId]);
+    const [[registration]] = await db.query(`
+      SELECT sub.subject_name 
+      FROM exam_registrations er 
+      JOIN subjects sub ON er.subject_id = sub.subject_id 
+      WHERE er.student_id = ? LIMIT 1
+    `, [studentId]);
+    
+    if (!registration) return res.status(400).json({ error: 'Please register for a subject first!' });
+
+    await db.query(`
+      INSERT INTO malpractice (roll_no, name, semester, subject_name, description, reported_by, action_taken) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      student.roll_no, 
+      student.name, 
+      student.semester, 
+      registration.subject_name, 
+      'Student found using mobile phone during exam', 
+      'Dr. Rajesh Kumar', 
+      'Exam cancelled'
+    ]);
+    
+    res.json({ message: 'You have been caught! Check Malpractice section.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/demo/reset/:id
 app.post('/api/demo/reset/:id', async (req, res) => {
   try {
     const studentId = req.params.id;
+    const [[student]] = await db.query('SELECT roll_no FROM students WHERE student_id = ?', [studentId]);
+    
     // Delete in reverse order of dependencies
     await db.query('DELETE e FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
     await db.query('DELETE ha FROM hall_allocations ha JOIN exam_registrations er ON ha.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
+    await db.query('DELETE FROM malpractice WHERE roll_no = ?', [student.roll_no]);
     await db.query('DELETE FROM exam_registrations WHERE student_id = ?', [studentId]);
     
     res.json({ message: 'Demo data reset successfully' });
