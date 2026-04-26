@@ -1,83 +1,98 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { AlertTriangle, User, ShieldAlert, CheckCircle2, Clock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { AlertTriangle, ShieldAlert, FileText, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Malpractice = () => {
+  const { user } = useAuth();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecords = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/malpractice');
+        const res = await axios.get(`http://localhost:5000/api/students/${user.id}/malpractice`);
         setRecords(res.data);
         setLoading(false);
       } catch (err) {
-        console.error("Error fetching malpractice records", err);
+        console.error(err);
         setLoading(false);
       }
     };
     fetchRecords();
-  }, []);
+  }, [user.id]);
 
-  const getStatusBadge = (status) => {
-    if (status === 'Resolved') return <span className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-bold uppercase"><CheckCircle2 size={12}/> Resolved</span>;
-    return <span className="flex items-center gap-1 text-yellow-600 bg-yellow-50 px-2 py-1 rounded text-xs font-bold uppercase"><Clock size={12}/> Pending</span>;
-  };
+  if (loading) return <div className="text-gray-500">Scanning records...</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <header>
-        <h1 className="text-2xl font-bold text-gray-900">Incident Reports</h1>
-        <p className="text-gray-500">Academic integrity and malpractice monitoring</p>
+        <h1 className="text-4xl font-black text-white mb-3 italic tracking-tighter">Incident Reports</h1>
+        <p className="text-gray-500 font-medium italic">Transparency and integrity records for your profile.</p>
       </header>
 
-      {loading ? (
-        <div className="p-12 text-center text-gray-500">Fetching incident logs...</div>
-      ) : (
-        <div className="space-y-4">
+      {records.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6">
           {records.map((record) => (
-            <div key={record.malpractice_id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:border-red-100 hover:shadow-red-50/50 hover:shadow-lg">
-              <div className="w-full md:w-64 bg-red-50 p-6 flex flex-col justify-between items-center text-center">
-                <div className="p-4 bg-red-100 text-red-600 rounded-full mb-4">
-                  <ShieldAlert size={32} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">{record.student_name}</h3>
-                  <p className="text-xs font-mono text-red-600 font-bold mt-1">{record.roll_no}</p>
-                </div>
-                <div className="mt-4">
-                  {getStatusBadge(record.status)}
+            <motion.div 
+              key={record.malpractice_id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="glass-card rounded-[2.5rem] p-10 border border-red-500/10 relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 p-8">
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 animate-pulse">
+                  <AlertTriangle size={32} />
                 </div>
               </div>
-              
-              <div className="flex-1 p-8 space-y-6">
-                <div className="flex justify-between items-start">
+
+              <div className="flex flex-col md:flex-row gap-10">
+                <div className="flex-1 space-y-6">
                   <div>
-                    <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Subject</h4>
-                    <p className="font-bold text-gray-900">{record.subject_name}</p>
+                    <h3 className="text-2xl font-black text-white mb-2 italic">{record.subject_name}</h3>
+                    <div className="flex gap-4">
+                      <span className="px-3 py-1 bg-red-500/10 text-red-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-500/20">
+                        {record.status}
+                      </span>
+                      <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest flex items-center gap-1">
+                        <FileText size={12} /> Ref: #{record.registration_id}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Reported By</h4>
-                    <p className="text-sm font-medium text-gray-700">{record.reported_by}</p>
+
+                  <div className="p-6 bg-cems-bg/50 rounded-2xl border border-white/5">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Description of Incident</p>
+                    <p className="text-sm text-gray-400 leading-relaxed italic">"{record.description}"</p>
                   </div>
-                </div>
 
-                <div>
-                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Incident Description</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl border border-gray-100 italic">
-                    "{record.description}"
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1 text-red-800">Action Taken</h4>
-                  <p className="text-sm font-bold text-red-700">{record.action_taken}</p>
+                  <div className="flex gap-4">
+                    <div className="flex-1 p-4 bg-white/2 rounded-xl">
+                      <p className="text-[9px] font-black text-gray-600 uppercase mb-1">Reported By</p>
+                      <p className="text-xs font-bold text-white">{record.reported_by}</p>
+                    </div>
+                    <div className="flex-1 p-4 bg-white/2 rounded-xl">
+                      <p className="text-[9px] font-black text-gray-600 uppercase mb-1">Action Taken</p>
+                      <p className="text-xs font-bold text-red-400">{record.action_taken}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
+      ) : (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-card rounded-[3rem] p-20 text-center border border-white/5 border-dashed"
+        >
+          <div className="w-20 h-20 bg-green-500/10 rounded-3xl flex items-center justify-center text-green-500 mx-auto mb-6 border border-green-500/20">
+            <CheckCircle2 size={40} />
+          </div>
+          <h3 className="text-2xl font-black text-white mb-2 italic">Clean Record</h3>
+          <p className="text-gray-500 max-w-sm mx-auto">No disciplinary actions or malpractice incidents have been reported against your profile. Keep up the high academic standards!</p>
+        </motion.div>
       )}
     </div>
   );

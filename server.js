@@ -1,98 +1,63 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { db, initDb } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Ensure DB is initialized
+// Initialize DB
 initDb();
 
-// --- AGGREGATE ENDPOINTS (Must be before CRUD routes to avoid conflicts) ---
+// --- Authentication Middleware ---
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-// 1. Result Summary (Avg marks per subject, pass percentage, etc.)
-app.get('/api/results/summary', (req, res) => {
+  if (!token) return res.status(401).json({ error: 'Access denied' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+};
+
+// --- Auth Endpoints ---
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password, role } = req.body;
+  
   try {
-    const summary = db.prepare(`
-      SELECT 
-        subject_name,
-        COUNT(*) as total_students,
-        AVG(marks) as average_marks,
-        MAX(marks) as highest_marks,
-        MIN(marks) as lowest_marks,
-        SUM(CASE WHEN marks >= 50 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as pass_percentage
-      FROM Evaluations
-      GROUP BY subject_name
-    `).all();
-    res.json(summary);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const table = role === 'student' ? 'Students' : 'Faculty';
+    const user = db.prepare(`SELECT * FROM ${table} WHERE email = ?`).get(email);
 
-// 2. Topper Students
-app.get('/api/students/topper', (req, res) => {
-  try {
-    const limit = req.query.limit || 10;
-    const toppers = db.prepare(`
-      SELECT 
-        student_name,
-        AVG(marks) as avg_marks,
-        SUM(marks) as total_marks,
-        COUNT(subject_name) as subjects_count
-      FROM Evaluations
-      GROUP BY student_name
-      ORDER BY avg_marks DESC
-      LIMIT ?
-    `).all(limit);
-    res.json(toppers);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-// 3. Gradesheet for a specific student
-app.get('/api/results/gradesheet/:studentId', (req, res) => {
-  try {
-    const studentId = req.params.studentId;
-    const student = db.prepare(`SELECT * FROM Students WHERE student_id = ?`).get(studentId);
-    if (!student) return res.status(404).json({ error: 'Student not found' });
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(401).json({ error: 'Invalid password' });
 
-    const grades = db.prepare(`
-      SELECT 
-        e.subject_name,
-        s.subject_code,
-        e.marks,
-        e.grade,
-        s.credits
-      FROM Evaluations e
-      JOIN Exam_Registrations er ON e.registration_id = er.registration_id
-      JOIN Subjects s ON er.subject_id = s.subject_id
-      WHERE er.student_id = ?
-    `).all(studentId);
-
-    const avgMarks = grades.length > 0 
-      ? (grades.reduce((acc, curr) => acc + curr.marks, 0) / grades.length).toFixed(2)
-      : 0;
+    const token = jwt.sign(
+      { id: user.student_id || user.faculty_id, role: user.role, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
 
     res.json({
-      student: {
-        id: student.student_id,
-        roll_no: student.roll_no,
-        name: `${student.first_name} ${student.last_name}`,
-        course: student.course,
-        semester: student.semester
-      },
-      results: grades,
-      summary: {
-        total_subjects: grades.length,
-        average_marks: avgMarks
+      token,
+      user: {
+        id: user.student_id || user.faculty_id,
+        name: `${user.first_name} ${user.last_name}`,
+        role: user.role,
+        email: user.email,
+        roll_no: user.roll_no || null
       }
     });
   } catch (err) {
@@ -100,155 +65,173 @@ app.get('/api/results/gradesheet/:studentId', (req, res) => {
   }
 });
 
-// Helper for generic CRUD
-const createCrudRoutes = (tableName, idColumn) => {
-  const router = express.Router();
-
-  // GET all with search and filter
-  router.get('/', (req, res) => {
-    try {
-      let query = `SELECT * FROM ${tableName}`;
-      const params = [];
-      const conditions = [];
-
-      Object.keys(req.query).forEach(key => {
-        if (key === 'limit' || key === 'offset') return;
-        if (key === 'semester') {
-          conditions.push(`semester = ?`);
-          params.push(req.query.semester);
-        } else if (key === 'search') {
-          // Simple search across all columns (requires dynamic building)
-          // For now, let's just support direct field filtering
-        } else {
-          conditions.push(`${key} = ?`);
-          params.push(req.query[key]);
-        }
-      });
-
-      if (conditions.length > 0) {
-        query += ` WHERE ` + conditions.join(' AND ');
-      }
-
-      if (req.query.limit) {
-        query += ` LIMIT ?`;
-        params.push(parseInt(req.query.limit));
-      }
-
-      const rows = db.prepare(query).all(...params);
-      res.json(rows);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET by ID
-  router.get('/:id', (req, res) => {
-    try {
-      const row = db.prepare(`SELECT * FROM ${tableName} WHERE ${idColumn} = ?`).get(req.params.id);
-      if (!row) return res.status(404).json({ error: 'Not found' });
-      res.json(row);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // POST create
-  router.post('/', (req, res) => {
-    try {
-      const keys = Object.keys(req.body);
-      const values = Object.values(req.body);
-      const placeholders = keys.map(() => '?').join(', ');
-      const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders})`;
-      const info = db.prepare(sql).run(...values);
-      res.status(201).json({ id: info.lastInsertRowid, ...req.body });
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-
-  // PUT update
-  router.put('/:id', (req, res) => {
-    try {
-      const keys = Object.keys(req.body);
-      const values = Object.values(req.body);
-      const setClause = keys.map(key => `${key} = ?`).join(', ');
-      const sql = `UPDATE ${tableName} SET ${setClause} WHERE ${idColumn} = ?`;
-      const info = db.prepare(sql).run(...values, req.params.id);
-      if (info.changes === 0) return res.status(404).json({ error: 'Not found' });
-      res.json({ message: 'Updated successfully' });
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-
-  // DELETE
-  router.delete('/:id', (req, res) => {
-    try {
-      const info = db.prepare(`DELETE FROM ${tableName} WHERE ${idColumn} = ?`).run(req.params.id);
-      if (info.changes === 0) return res.status(404).json({ error: 'Not found' });
-      res.json({ message: 'Deleted successfully' });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  return router;
-};
-
-// Register CRUD routes
-app.use('/api/students', createCrudRoutes('Students', 'student_id'));
-app.use('/api/subjects', createCrudRoutes('Subjects', 'subject_id'));
-app.use('/api/examinations', createCrudRoutes('Examinations', 'exam_id'));
-app.use('/api/registrations', createCrudRoutes('Exam_Registrations', 'registration_id'));
-
-// Custom Timetable route with Semester join
-app.get('/api/timetable', (req, res) => {
+// --- Student Endpoints ---
+app.get('/api/students/:id', authenticateToken, (req, res) => {
   try {
-    let query = `
-      SELECT t.*, s.semester 
-      FROM Exam_Timetable t
-      JOIN Subjects s ON t.subject_id = s.subject_id
-    `;
-    const params = [];
-    if (req.query.semester) {
-      query += ` WHERE s.semester = ?`;
-      params.push(req.query.semester);
-    }
-    const rows = db.prepare(query).all(...params);
-    res.json(rows);
+    const student = db.prepare('SELECT * FROM Students WHERE student_id = ?').get(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    res.json(student);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-app.use('/api/timetable', createCrudRoutes('Exam_Timetable', 'timetable_id'));
-app.use('/api/halls', createCrudRoutes('Exam_Halls', 'hall_id'));
-app.use('/api/allocations', createCrudRoutes('Hall_Allocations', 'allocation_id'));
-app.use('/api/faculty', createCrudRoutes('Faculty', 'faculty_id'));
-app.use('/api/evaluations', createCrudRoutes('Evaluations', 'evaluation_id'));
-app.use('/api/malpractice', createCrudRoutes('Malpractice', 'malpractice_id'));
 
-// Root route
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'College Examination Management API is running',
-    endpoints: [
-      '/api/students',
-      '/api/subjects',
-      '/api/examinations',
-      '/api/registrations',
-      '/api/timetable',
-      '/api/halls',
-      '/api/allocations',
-      '/api/faculty',
-      '/api/evaluations',
-      '/api/malpractice',
-      '/api/results/summary',
-      '/api/students/topper',
-      '/api/results/gradesheet/:studentId'
-    ]
-  });
+app.get('/api/students/:id/timetable', authenticateToken, (req, res) => {
+  try {
+    const student = db.prepare('SELECT semester FROM Students WHERE student_id = ?').get(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const timetable = db.prepare(`
+      SELECT t.*, s.type 
+      FROM Exam_Timetable t
+      JOIN Subjects s ON t.subject_id = s.subject_id
+      WHERE s.semester = ?
+    `).all(student.semester);
+    res.json(timetable);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/students/:id/seat', authenticateToken, (req, res) => {
+  try {
+    const allocation = db.prepare(`
+      SELECT ha.* 
+      FROM Hall_Allocations ha
+      JOIN Exam_Registrations er ON ha.registration_id = er.registration_id
+      WHERE er.student_id = ?
+      LIMIT 1
+    `).get(req.params.id);
+    res.json(allocation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/students/:id/results', authenticateToken, (req, res) => {
+  try {
+    const results = db.prepare(`
+      SELECT e.*, s.subject_code, s.credits
+      FROM Evaluations e
+      JOIN Exam_Registrations er ON e.registration_id = er.registration_id
+      JOIN Subjects s ON er.subject_id = s.subject_id
+      WHERE er.student_id = ?
+    `).all(req.params.id);
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Faculty Endpoints ---
+app.get('/api/faculty/:id/evaluations', authenticateToken, (req, res) => {
+  try {
+    const evaluations = db.prepare('SELECT * FROM Evaluations WHERE faculty_id = ?').all(req.params.id);
+    res.json(evaluations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/evaluations/:id', authenticateToken, (req, res) => {
+  const { marks, grade } = req.body;
+  try {
+    const info = db.prepare('UPDATE Evaluations SET marks = ?, grade = ?, status = "Graded" WHERE evaluation_id = ?')
+      .run(marks, grade, req.params.id);
+    if (info.changes === 0) return res.status(404).json({ error: 'Evaluation not found' });
+    res.json({ message: 'Updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/subjects', (req, res) => {
+  const { semester } = req.query;
+  try {
+    let query = 'SELECT * FROM Subjects';
+    const params = [];
+    if (semester) {
+      query += ' WHERE semester = ?';
+      params.push(semester);
+    }
+    const subjects = db.prepare(query).all(...params);
+    res.json(subjects);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/students', authenticateToken, (req, res) => {
+  const { semester, search } = req.query;
+  try {
+    let query = 'SELECT * FROM Students WHERE 1=1';
+    const params = [];
+    if (semester) {
+      query += ' AND semester = ?';
+      params.push(semester);
+    }
+    if (search) {
+      query += ' AND (first_name LIKE ? OR last_name LIKE ? OR roll_no LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    const students = db.prepare(query).all(...params);
+    res.json(students);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Dashboard Stats for Student
+app.get('/api/students/:id/dashboard', authenticateToken, (req, res) => {
+  try {
+    const regCount = db.prepare('SELECT COUNT(*) as count FROM Exam_Registrations WHERE student_id = ?').get(req.params.id);
+    const evalCount = db.prepare('SELECT COUNT(*) as count FROM Evaluations e JOIN Exam_Registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?').get(req.params.id);
+    const latestResult = db.prepare('SELECT e.* FROM Evaluations e JOIN Exam_Registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ? ORDER BY e.evaluation_id DESC LIMIT 1').get(req.params.id);
+    const notices = db.prepare('SELECT * FROM Notices ORDER BY notice_id DESC LIMIT 3').all();
+
+    res.json({
+      registeredSubjects: regCount.count,
+      completedExams: evalCount.count,
+      latestResult,
+      notices
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Malpractice Endpoints
+app.get('/api/students/:id/malpractice', authenticateToken, (req, res) => {
+  try {
+    const records = db.prepare('SELECT * FROM Malpractice WHERE student_id = ?').all(req.params.id);
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/malpractice', authenticateToken, (req, res) => {
+  try {
+    const records = db.prepare('SELECT * FROM Malpractice').all();
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/malpractice', authenticateToken, (req, res) => {
+  const { registration_id, student_id, student_name, roll_no, subject_name, description, reported_by, action_taken, status } = req.body;
+  try {
+    const info = db.prepare(`
+      INSERT INTO Malpractice (registration_id, student_id, student_name, roll_no, subject_name, description, reported_by, action_taken, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(registration_id, student_id, student_name, roll_no, subject_name, description, reported_by, action_taken, status);
+    res.json({ id: info.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

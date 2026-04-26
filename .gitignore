@@ -1,6 +1,9 @@
-﻿node_modules/
-frontend/node_modules/
-*.db
-dist/
+node_modules/
 .env
+*.db
+*.db-journal
+frontend/node_modules/
+data/
+dist/
+build/
 .DS_Store

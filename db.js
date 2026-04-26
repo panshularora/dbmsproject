@@ -3,8 +3,23 @@ const path = require('path');
 
 const db = new Database(path.join(__dirname, 'exam_management.db'));
 
-// Initialize tables
-const initDb = () => {
+const initDb = (drop = false) => {
+  if (drop) {
+    db.exec(`
+      DROP TABLE IF EXISTS Students;
+      DROP TABLE IF EXISTS Subjects;
+      DROP TABLE IF EXISTS Examinations;
+      DROP TABLE IF EXISTS Exam_Registrations;
+      DROP TABLE IF EXISTS Exam_Timetable;
+      DROP TABLE IF EXISTS Exam_Halls;
+      DROP TABLE IF EXISTS Hall_Allocations;
+      DROP TABLE IF EXISTS Faculty;
+      DROP TABLE IF EXISTS Evaluations;
+      DROP TABLE IF EXISTS Malpractice;
+      DROP TABLE IF EXISTS Notices;
+    `);
+  }
+  
   db.exec(`
     CREATE TABLE IF NOT EXISTS Students (
       student_id INTEGER PRIMARY KEY,
@@ -13,7 +28,10 @@ const initDb = () => {
       last_name TEXT,
       phone_no TEXT,
       course TEXT,
-      semester INTEGER
+      semester INTEGER,
+      email TEXT UNIQUE,
+      password TEXT,
+      role TEXT DEFAULT 'student'
     );
 
     CREATE TABLE IF NOT EXISTS Subjects (
@@ -21,7 +39,8 @@ const initDb = () => {
       subject_code TEXT UNIQUE,
       subject_name TEXT,
       credits INTEGER,
-      semester INTEGER
+      semester INTEGER,
+      type TEXT
     );
 
     CREATE TABLE IF NOT EXISTS Examinations (
@@ -37,10 +56,7 @@ const initDb = () => {
       exam_id INTEGER,
       student_name TEXT,
       subject_name TEXT,
-      appearance_status TEXT,
-      FOREIGN KEY(student_id) REFERENCES Students(student_id),
-      FOREIGN KEY(subject_id) REFERENCES Subjects(subject_id),
-      FOREIGN KEY(exam_id) REFERENCES Examinations(exam_id)
+      appearance_status TEXT
     );
 
     CREATE TABLE IF NOT EXISTS Exam_Timetable (
@@ -50,8 +66,8 @@ const initDb = () => {
       subject_name TEXT,
       exam_date TEXT,
       exam_time TEXT,
-      FOREIGN KEY(exam_id) REFERENCES Examinations(exam_id),
-      FOREIGN KEY(subject_id) REFERENCES Subjects(subject_id)
+      venue TEXT,
+      status TEXT DEFAULT 'Upcoming'
     );
 
     CREATE TABLE IF NOT EXISTS Exam_Halls (
@@ -65,10 +81,8 @@ const initDb = () => {
       registration_id INTEGER,
       hall_id INTEGER,
       hall_name TEXT,
-      seat_no INTEGER,
-      student_name TEXT,
-      FOREIGN KEY(registration_id) REFERENCES Exam_Registrations(registration_id),
-      FOREIGN KEY(hall_id) REFERENCES Exam_Halls(hall_id)
+      seat_no TEXT,
+      student_name TEXT
     );
 
     CREATE TABLE IF NOT EXISTS Faculty (
@@ -76,7 +90,10 @@ const initDb = () => {
       first_name TEXT,
       last_name TEXT,
       department TEXT,
-      qualification TEXT
+      qualification TEXT,
+      email TEXT UNIQUE,
+      password TEXT,
+      role TEXT DEFAULT 'faculty'
     );
 
     CREATE TABLE IF NOT EXISTS Evaluations (
@@ -88,8 +105,7 @@ const initDb = () => {
       subject_name TEXT,
       marks INTEGER,
       grade TEXT,
-      FOREIGN KEY(registration_id) REFERENCES Exam_Registrations(registration_id),
-      FOREIGN KEY(faculty_id) REFERENCES Faculty(faculty_id)
+      status TEXT DEFAULT 'Graded'
     );
 
     CREATE TABLE IF NOT EXISTS Malpractice (
@@ -102,9 +118,14 @@ const initDb = () => {
       description TEXT,
       reported_by TEXT,
       action_taken TEXT,
-      status TEXT,
-      FOREIGN KEY(registration_id) REFERENCES Exam_Registrations(registration_id),
-      FOREIGN KEY(student_id) REFERENCES Students(student_id)
+      status TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS Notices (
+      notice_id INTEGER PRIMARY KEY,
+      title TEXT,
+      content TEXT,
+      date TEXT
     );
   `);
 };

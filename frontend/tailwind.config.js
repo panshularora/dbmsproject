@@ -7,11 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: {
-          900: '#0f172a',
-          800: '#1e293b',
-          700: '#334155',
-        }
+        'cems-bg': '#0d1117',
+        'cems-sidebar': '#161b22',
+        'cems-card': '#1c2128',
+        'cems-purple': '#8b5cf6',
+        'cems-blue': '#3b82f6',
       }
     },
   },
