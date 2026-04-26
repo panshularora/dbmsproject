@@ -29,38 +29,41 @@ const StudentResults = () => {
     fetchResults();
   }, [user.id]);
 
-  // GPA: prefer from API result (vw_student_results), then from user context (set at login), else 0.00
-  const gpa = (results.length > 0 && results[0].gpa)
-    ? Number(results[0].gpa).toFixed(2)
-    : (user?.gpa ? Number(user.gpa).toFixed(2) : '0.00');
+  // If there are no results (e.g., after demo reset), show 0.00 instead of the cached login GPA.
+  const gpa = results.length === 0
+    ? '0.00'
+    : ((results[0].gpa != null)
+      ? Number(results[0].gpa).toFixed(2)
+      : (user?.gpa ? Number(user.gpa).toFixed(2) : '0.00'));
 
   const handleDownloadPDF = () => {
+    if (results.length === 0) { alert('No results to download yet.'); return; }
     const doc = new jsPDF();
     doc.setFontSize(20);
     doc.text('SRM Institute of Science and Technology', 14, 22);
     doc.setFontSize(14);
     doc.text('Official Grade Sheet', 14, 32);
     
-    doc.setFontSize(12);
-    doc.text(`Student ID: ${user?.id}`, 14, 45);
+    doc.setFontSize(11);
+    doc.text(`Student: ${results[0]?.name || user?.name}`, 14, 45);
     doc.text(`Semester: ${user?.semester || 1}`, 14, 52);
-    doc.text(`Current GPA: ${gpa}`, 14, 59);
+    doc.text(`Cumulative GPA: ${gpa}`, 14, 59);
 
-    const tableData = results.map(r => [
-      r.subject_code || `SUB-${r.subject_id}`,
+    const tableData = results.map((r, i) => [
+      String(i + 1).padStart(2, '0'),
       r.subject_name,
-      r.credits,
-      r.marks,
-      r.grade
+      r.credits || '—',
+      r.marks != null ? Number(r.marks).toFixed(2) : '—',
+      r.grade || '—'
     ]);
 
     doc.autoTable({
       startY: 70,
-      head: [['Code', 'Subject', 'Credits', 'Marks', 'Grade']],
+      head: [['#', 'Subject', 'Credits', 'Marks', 'Grade']],
       body: tableData,
       theme: 'grid',
       styles: { fontSize: 10 },
-      headStyles: { fillColor: [59, 130, 246] }
+      headStyles: { fillColor: [99, 102, 241] }
     });
 
     doc.save(`SRM_Grade_Sheet_${user?.id}.pdf`);

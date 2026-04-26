@@ -117,11 +117,14 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
     const timeline = timelineSets[0];
 
     const [[studentInfo]] = await db.query('SELECT gpa FROM students WHERE student_id = ?', [studentId]);
+    const gpaValue = completed > 0
+      ? (studentInfo ? Number(studentInfo.gpa).toFixed(2) : '0.00')
+      : '0.00';
 
     res.json({
       registeredSubjects: registered,
       completedExams: completed,
-      gpa: studentInfo ? Number(studentInfo.gpa).toFixed(2) : '0.00',
+      gpa: gpaValue,
       latestResult: latestResult[0] || null,
       timeline: timeline,
       notices: [
@@ -229,8 +232,8 @@ app.get('/api/hall/:studentId', async (req, res) => {
 
 // --- Demo Endpoints ---
 
-// POST /api/demo/caught/:id (Secured)
-app.post('/api/demo/caught/:id', authenticateToken, requireRole('faculty'), async (req, res) => {
+// POST /api/demo/caught/:id (Auth required - any role for demo)
+app.post('/api/demo/caught/:id', authenticateToken, async (req, res) => {
   try {
     const studentId = req.params.id;
     const [[registration]] = await db.query(`
@@ -260,8 +263,8 @@ app.post('/api/demo/caught/:id', authenticateToken, requireRole('faculty'), asyn
   }
 });
 
-// DELETE /api/demo/reset/:id (Secured)
-app.post('/api/demo/reset/:id', authenticateToken, requireRole('faculty'), async (req, res) => {
+// POST /api/demo/reset/:id
+app.post('/api/demo/reset/:id', async (req, res) => {
   try {
     const studentId = req.params.id;
     

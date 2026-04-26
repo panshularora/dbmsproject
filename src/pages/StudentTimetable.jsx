@@ -35,31 +35,31 @@ const StudentTimetable = () => {
   }, [user.id]);
 
   const handleDownloadPDF = () => {
+    if (timetable.length === 0) { alert('No timetable to download. Please register for subjects first.'); return; }
     const doc = new jsPDF();
     doc.setFontSize(20);
     doc.text('SRM Institute of Science and Technology', 14, 22);
     doc.setFontSize(14);
     doc.text('Examination Timetable', 14, 32);
     
-    doc.setFontSize(12);
-    doc.text(`Student ID: ${user?.id}`, 14, 45);
+    doc.setFontSize(11);
+    doc.text(`Student: ${user?.name}`, 14, 45);
     doc.text(`Semester: ${user?.semester || 1}`, 14, 52);
 
-    const tableData = timetable.map(row => [
-      row.subject_code || `SUB-${row.subject_id}`,
+    const tableData = timetable.map((row, i) => [
+      String(i + 1).padStart(2, '0'),
       row.subject_name,
-      new Date(row.exam_date).toLocaleDateString(),
-      row.exam_time,
-      row.venue
+      new Date(row.exam_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      row.exam_time
     ]);
 
     doc.autoTable({
       startY: 60,
-      head: [['Code', 'Subject', 'Date', 'Time', 'Venue']],
+      head: [['#', 'Subject', 'Date', 'Time']],
       body: tableData,
       theme: 'grid',
       styles: { fontSize: 10 },
-      headStyles: { fillColor: [59, 130, 246] }
+      headStyles: { fillColor: [99, 102, 241] }
     });
 
     doc.save(`SRM_Timetable_${user?.id}.pdf`);

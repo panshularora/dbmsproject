@@ -65,10 +65,10 @@ const StudentDashboard = () => {
       return `${r}${c}`;
     };
 
-    const tableData = data.timeline.map(row => [
-      row.subject_code || `SUB`,
+    const tableData = data.timeline.map((row, i) => [
+      String(i + 1).padStart(2, '0'),
       row.subject,
-      new Date(row.date).toLocaleDateString(),
+      new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       row.time,
       row.hall_name || 'TBA',
       getSeatString(row.seat_no)
@@ -200,8 +200,12 @@ const StudentDashboard = () => {
               <button 
                 onClick={async () => {
                   if (window.confirm('Reset all your demo data (registrations, seats, results)?')) {
-                    await api.post(`/demo/reset/${user.id}`);
-                    window.location.reload();
+                    try {
+                      await api.post(`/demo/reset/${user.id}`);
+                      window.location.reload();
+                    } catch (err) {
+                      alert(err.response?.data?.error || 'Failed to reset demo data');
+                    }
                   }
                 }}
                 className="px-4 py-2 bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-500/20 transition-all"
@@ -298,7 +302,7 @@ const StudentDashboard = () => {
               </div>
             </div>
             <h3 className="text-xl font-bold text-white mb-8">Latest Result</h3>
-            {data?.latestResult ? (
+            {data?.latestResult && data.latestResult.subject_name ? (
               <div className="text-center relative">
                 <motion.div 
                   initial={{ scale: 0.5, rotate: -20 }}
