@@ -20,7 +20,7 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password, role } = req.body;
   try {
     const table = role === 'faculty' ? 'faculty' : 'students';
-    const idField = role === 'faculty' ? 'faculty_id' : 'student_id';
+    const idField = role === 'faculty' ? 'faculty_id' : 'roll_no';
     
     // In normalized MySQL, we'll look for the user in their respective table
     const [users] = await db.query(`SELECT * FROM ${table} WHERE email = ?`, [email]);
@@ -28,8 +28,6 @@ app.post('/api/auth/login', async (req, res) => {
     if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
     
     const user = users[0];
-    // Check password (assuming plain text or bcrypt)
-    // For now, checking plain text as per user's previous data, but supporting bcrypt
     const isMatch = (password === user.password) || (user.password_hash && await bcrypt.compare(password, user.password_hash));
     
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
@@ -40,7 +38,7 @@ app.post('/api/auth/login', async (req, res) => {
       token,
       user: {
         id: user[idField],
-        name: user.first_name + ' ' + user.last_name,
+        name: user.name || (user.first_name + ' ' + user.last_name),
         email: user.email,
         role,
         semester: user.semester
@@ -55,19 +53,18 @@ app.post('/api/auth/login', async (req, res) => {
 // GET /api/students/:id/dashboard
 app.get('/api/students/:id/dashboard', async (req, res) => {
   try {
-    const studentId = req.params.id;
+    const rollNo = req.params.id;
     
     // Aggregate data
-    const [[{ count: registered }]] = await db.query('SELECT COUNT(*) as count FROM exam_registrations WHERE student_id = ?', [studentId]);
-    const [[{ count: completed }]] = await db.query('SELECT COUNT(*) as count FROM evaluations e JOIN exam_registrations er ON e.registration_id = er.registration_id WHERE er.student_id = ?', [studentId]);
+    const [[{ count: registered }]] = await db.query('SELECT COUNT(*) as count FROM exam_registrations WHERE roll_no = ?', [rollNo]);
+    const [[{ count: completed }]] = await db.query('SELECT COUNT(*) as count FROM evaluations WHERE roll_no = ?', [rollNo]);
     const [latestResult] = await db.query(`
       SELECT sub.subject_name, e.marks, e.grade 
       FROM evaluations e 
-      JOIN exam_registrations er ON e.registration_id = er.registration_id 
-      JOIN subjects sub ON er.subject_id = sub.subject_id 
-      WHERE er.student_id = ? 
+      JOIN subjects sub ON e.subject_code = sub.subject_code 
+      WHERE e.roll_no = ? 
       ORDER BY e.evaluation_id DESC LIMIT 1
-    `, [studentId]);
+    `, [rollNo]);
 
     res.json({
       registeredSubjects: registered,
@@ -112,12 +109,11 @@ app.get('/api/subjects', async (req, res) => {
 app.get('/api/results/:studentId', async (req, res) => {
   try {
     const sql = `
-      SELECT s.first_name, s.last_name, sub.subject_name, e.marks
+      SELECT s.name, sub.subject_name, e.marks, e.grade
       FROM students s
-      JOIN exam_registrations er ON s.student_id = er.student_id
-      JOIN subjects sub ON er.subject_id = sub.subject_id
-      JOIN evaluations e ON er.registration_id = e.registration_id
-      WHERE s.student_id = ?
+      JOIN evaluations e ON s.roll_no = e.roll_no
+      JOIN subjects sub ON e.subject_code = sub.subject_code
+      WHERE s.roll_no = ?
     `;
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows);
@@ -133,7 +129,7 @@ app.get('/api/timetable', async (req, res) => {
     const sql = `
       SELECT sub.subject_name, t.exam_date, t.exam_time
       FROM exam_timetable t
-      JOIN subjects sub ON t.subject_id = sub.subject_id
+      JOIN subjects sub ON t.subject_code = sub.subject_code
     `;
     const [rows] = await db.query(sql);
     res.json(rows);
@@ -149,9 +145,8 @@ app.get('/api/hall/:studentId', async (req, res) => {
     const sql = `
       SELECT h.hall_name, ha.seat_no
       FROM hall_allocations ha
-      JOIN exam_registrations er ON ha.registration_id = er.registration_id
       JOIN exam_halls h ON ha.hall_id = h.hall_id
-      WHERE er.student_id = ?
+      WHERE ha.roll_no = ?
     `;
     const [rows] = await db.query(sql, [req.params.studentId]);
     res.json(rows[0] || { message: 'No allocation found' });
@@ -163,12 +158,13 @@ app.get('/api/hall/:studentId', async (req, res) => {
 
 // POST /api/register
 app.post('/api/register', async (req, res) => {
-  const { student_id, subject_id, exam_id } = req.body;
+  const { student_id, subject_id } = req.body;
   try {
-    const sql = 'INSERT INTO exam_registrations (student_id, subject_id, exam_id) VALUES (?, ?, ?)';
-    const [result] = await db.query(sql, [student_id, subject_id, exam_id]);
+    const sql = 'INSERT INTO exam_registrations (roll_no, subject_code) VALUES (?, ?)';
+    const [result] = await db.query(sql, [student_id, subject_id]);
     res.json({ message: 'Registration successful', id: result.insertId });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
