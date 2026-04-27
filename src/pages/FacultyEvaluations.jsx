@@ -9,6 +9,7 @@ const FacultyEvaluations = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [marks, setMarks] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchEvals();
@@ -48,6 +49,8 @@ const FacultyEvaluations = () => {
             <input 
               type="text" 
               placeholder="Search students..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-cems-card border border-gray-800 rounded-xl pl-12 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cems-blue transition-all"
             />
           </div>
@@ -67,7 +70,13 @@ const FacultyEvaluations = () => {
               </tr>
             </thead>
             <tbody>
-              {evaluations.map((item) => (
+              {evaluations
+                .filter(item => 
+                  item.student_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  item.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  String(item.registration_id).includes(searchTerm)
+                )
+                .map((item) => (
                 <tr key={item.evaluation_id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-all">
                   <td className="px-8 py-6">
                     <div className="font-bold text-white">{item.student_name}</div>
