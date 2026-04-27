@@ -121,16 +121,18 @@ app.get('/api/students/:id/dashboard', async (req, res) => {
       ? (studentInfo ? Number(studentInfo.gpa).toFixed(2) : '0.00')
       : '0.00';
 
+    const [notices] = await db.query('SELECT title, message as content FROM notifications WHERE student_id = ? ORDER BY created_at DESC LIMIT 5', [studentId]);
+
+    // If no real notices exist, we can fallback to an empty array
+    // The previous hardcoded ones are replaced by real-time data now.
+
     res.json({
       registeredSubjects: registered,
       completedExams: completed,
       gpa: gpaValue,
       latestResult: latestResult[0] || null,
       timeline: timeline,
-      notices: [
-        { title: 'End Semester Exams', content: 'Final exams start from May 12, 2025.' },
-        { title: 'Hall Ticket Download', content: 'Download your hall tickets from the portal.' }
-      ]
+      notices: notices
     });
   } catch (err) {
     console.error(err);
