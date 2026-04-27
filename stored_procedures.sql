@@ -97,6 +97,10 @@ BEGIN
         INSERT INTO hall_allocations (registration_id, hall_id, seat_no) 
         VALUES (v_registration_id, v_random_hall, v_random_seat);
 
+        -- Add pending evaluation record for faculty (default to faculty_id 1 for demo purposes)
+        INSERT INTO evaluations (registration_id, faculty_id, marks, grade)
+        VALUES (v_registration_id, 1, NULL, NULL);
+
         COMMIT;
 
         -- Return the new registration ID
