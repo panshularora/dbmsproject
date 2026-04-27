@@ -21,6 +21,7 @@ const StudentDashboard = () => {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,9 +29,12 @@ const StudentDashboard = () => {
       try {
         const res = await api.get(`/students/${user.id}/dashboard`);
         setData(res.data);
+        setError('');
         setLoading(false);
       } catch (err) {
         console.error(err);
+        setError(err.response?.data?.error || 'Failed to load dashboard');
+        setData(null);
         setLoading(false);
       }
     };
@@ -97,6 +101,15 @@ const StudentDashboard = () => {
       <div className="w-12 h-12 border-4 border-cems-purple border-t-transparent rounded-full animate-spin"></div>
     </div>
   );
+
+  if (error) {
+    return (
+      <div className="glass-card rounded-[2rem] p-10 border border-white/10 text-center">
+        <h2 className="text-xl font-black text-white mb-2">Dashboard unavailable</h2>
+        <p className="text-sm text-gray-500 font-medium">{error}</p>
+      </div>
+    );
+  }
 
   const container = {
     hidden: { opacity: 0 },
@@ -363,7 +376,7 @@ const StudentDashboard = () => {
               <Bell className="text-orange-500" /> Notifications
             </h3>
             <div className="space-y-4">
-              {data?.notices.map((notice, i) => (
+              {(data?.notices || []).map((notice, i) => (
                 <motion.div 
                   key={i}
                   whileHover={{ scale: 1.02, x: 5 }}
