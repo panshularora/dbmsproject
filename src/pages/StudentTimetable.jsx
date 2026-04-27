@@ -16,13 +16,10 @@ const StudentTimetable = () => {
     const fetchTimetable = async () => {
       try {
         const res = await api.get(`/timetable/${user.id}`);
-        // Mandated return: subject_name, exam_date, exam_time
+        // Use real values from API
         const formatted = res.data.map((row, i) => ({
           ...row,
-          timetable_id: i,
-          type: 'Core', // Mocking as not in mandate
-          venue: 'Main Hall', // Mocking
-          status: 'Upcoming' // Mocking
+          timetable_id: i
         }));
         setTimetable(formatted);
         setLoading(false);
