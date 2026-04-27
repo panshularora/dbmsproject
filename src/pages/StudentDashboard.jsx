@@ -203,11 +203,54 @@ const StudentDashboard = () => {
           {/* Timeline Section */}
           <motion.div variants={item} className="glass-card rounded-[3rem] p-10 border border-white/5 relative overflow-hidden">
             <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-black text-white italic tracking-tighter">Command Center</h2>
-                <p className="text-gray-500 font-medium">Mission control for your academic journey</p>
-              </div>
+            <div>
+              <h2 className="text-3xl font-black text-white italic tracking-tighter">Command Center</h2>
+              <p className="text-gray-500 font-medium">Mission control for your academic journey</p>
             </div>
+            
+            {/* Demo Controls */}
+            <div className="flex gap-4 p-2 bg-cems-card/50 rounded-2xl border border-white/5">
+              <button 
+                onClick={async () => {
+                  if (window.confirm('Reset all your demo data (registrations, seats, results)?')) {
+                    try {
+                      await api.post(`/demo/reset/${user.id}`);
+                      window.location.reload();
+                    } catch (err) {
+                      alert(err.response?.data?.error || 'Failed to reset demo data');
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-500/20 transition-all"
+              >
+                Reset Demo
+              </button>
+              <button 
+                onClick={async () => {
+                  await api.post(`/demo/evaluate/${user.id}`);
+                  alert('Results generated for registered subjects!');
+                  window.location.reload();
+                }}
+                className="px-4 py-2 bg-cems-purple/10 text-cems-purple text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-cems-purple/20 transition-all"
+              >
+                Mock Results
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    await api.post(`/demo/caught/${user.id}`);
+                    alert('You have been CAUGHT cheating! Check the Malpractice section.');
+                    window.location.reload();
+                  } catch (err) {
+                    alert(err.response?.data?.error || 'Failed to trigger demo');
+                  }
+                }}
+                className="px-4 py-2 bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-orange-500/20 transition-all"
+              >
+                Simulate Malpractice
+              </button>
+            </div>
+          </div>
             <div className="flex justify-between items-center mb-10">
               <h3 className="text-2xl font-black text-white italic flex items-center gap-4">
                 <div className="p-3 bg-cems-blue/10 rounded-2xl text-cems-blue">
