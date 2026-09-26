@@ -78,7 +78,8 @@ app.post('/api/auth/login', async (req, res) => {
     if (users.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
     
     const user = users[0];
-    const isMatch = (password === user.password) || (user.password_hash && await bcrypt.compare(password, user.password_hash));
+    // bcrypt only: accounts without a password_hash cannot log in.
+    const isMatch = typeof password === 'string' && Boolean(user.password_hash) && await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
     
@@ -165,7 +166,8 @@ app.get('/api/students', authenticateToken, requireRole('faculty'), async (req, 
     sql += ' ORDER BY name, roll_no';
 
     const [rows] = await db.query(sql, params);
-    res.json(rows);
+    // Never send credential columns to the client.
+    res.json(rows.map(({ password, password_hash, ...student }) => student));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -587,9 +589,7 @@ async function ensureDemoUsers() {
       if (cols.has('email')) { insertCols.push('email'); insertVals.push('faculty@srm.edu.in'); }
       if (cols.has('department')) { insertCols.push('department'); insertVals.push('CSE'); }
 
-      if (cols.has('password')) {
-        insertCols.push('password'); insertVals.push('faculty');
-      } else if (cols.has('password_hash')) {
+      if (cols.has('password_hash')) {
         insertCols.push('password_hash'); insertVals.push(await bcrypt.hash('faculty', 10));
       }
 
@@ -616,9 +616,7 @@ async function ensureDemoUsers() {
       if (cols.has('gpa')) { insertCols.push('gpa'); insertVals.push(0.0); }
       if (cols.has('phone_no')) { insertCols.push('phone_no'); insertVals.push('9999999999'); }
 
-      if (cols.has('password')) {
-        insertCols.push('password'); insertVals.push('student');
-      } else if (cols.has('password_hash')) {
+      if (cols.has('password_hash')) {
         insertCols.push('password_hash'); insertVals.push(await bcrypt.hash('student', 10));
       }
 
