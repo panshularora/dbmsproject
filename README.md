@@ -1,50 +1,47 @@
-# SRM Exam Portal (MySQL Edition)
+# SRM Exam Portal: MySQL-backed exam management system
 
-A high-fidelity examination management system refactored for MySQL and Express.
+**What:** student and faculty portals for exam registration, timetables, seat and hall allocation, grading, malpractice reports, results (with PDF export), notifications, and an audit log.
+**Why:** a DBMS course project (29 commits, 26–27 Apr 2026). The aim was to push the logic into the database with stored procedures, triggers and views, and not only CRUD from the API.
 
-## 📁 Project Structure
-- `/src`: Frontend React (Vite) source code.
-- `/server`: Node.js + Express backend.
-- `/public`: Static assets for the frontend.
-- `.env`: Environment configuration for DB and JWT.
+**Status:** runs locally against your own MySQL instance. There are no automated tests and no deployment.
 
-## 🚀 Getting Started
+## Database work
+| Feature | Files |
+|---|---|
+| Stored procedures for results, timetable, hall allocation, malpractice and result publishing. `RegisterForExam` and `ResetDemoData` run inside `START TRANSACTION` / `COMMIT`, with a `ROLLBACK` exit handler | `stored_procedures.sql`, `patch_sp.sql`, `update_sp_to_view.sql` |
+| Triggers: grade and GPA computation, audit logging on inserts, updates and deletes | `triggers.sql`, `audit_triggers.sql`, `audit_log.sql` |
+| Views for result and schedule reads | `create_views.sql` |
+| B-tree indexes on hot lookups (e.g., roll number, registrations by student) | `update_db.sql` |
+| Notifications table and search | `notifications_and_search.sql` |
 
-### 1. Database Setup
-Ensure MySQL is running and an `exam_db` database exists with the normalized schema. Update the `.env` file with your MySQL credentials:
-```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=exam_db
-```
+About 690 lines of SQL in total. The UI includes a "SQL Query Visualizer" page that shows the queries behind each screen.
 
-#### Audit log (optional, for Faculty → Database)
-Apply after your base schema and existing triggers:
-```bash
-mysql -u root -p exam_db < audit_log.sql
-mysql -u root -p exam_db < audit_triggers.sql
-```
+## API (Express + mysql2)
+JWT auth (`jsonwebtoken`) with role checks for student and faculty, input validation with `express-validator`, request logging with `morgan`. Main routes:
+`GET /api/students`, `GET /api/faculty/:id/evaluations`, `PUT /api/evaluations/:evaluationId`, `POST /api/malpractice`, `GET /api/audit-log`, `GET /api/results/:studentId`, `GET /api/timetable`, `GET /api/hall/:studentId`, `POST /api/register`.
 
-### 2. Install Dependencies
-Run from the root:
-```bash
-npm install
-cd server
-npm install
-```
+## Run
+1. Create an `exam_db` database in MySQL. **The base schema (students, faculty, subjects, exam_registrations, evaluations, …) is not in this repo yet.** The SQL files here are migrations and patches on top of it. See "Known gaps".
+2. Apply the SQL files: procedures, triggers, views, then `audit_log.sql` and `audit_triggers.sql`.
+3. Create `.env` in the repo root:
+   ```env
+   DB_HOST=localhost
+   DB_USER=root
+   DB_PASSWORD=your_password
+   DB_NAME=exam_db
+   JWT_SECRET=change-me   # server falls back to a hard-coded default if unset
+   ```
+4. Install and start:
+   ```bash
+   npm run install:all
+   npm run server     # API on http://localhost:5000
+   npm run dev        # UI on http://localhost:5173
+   ```
 
-### 3. Run the Application
-- **Frontend**: `npm run dev` (Runs on http://localhost:5173)
-- **Backend**: `npm run server` (Runs on http://localhost:5000)
+## Known gaps (course-project level)
+- **Missing base schema:** add a `schema.sql` (CREATE TABLEs) and seed data so the project can be set up from scratch.
+- **Plaintext demo passwords:** `restore_credentials.sql` sets demo passwords in plain text, and login accepts `password === user.password` as well as bcrypt hashes (`server/server.js`). Fine for a classroom demo; switch to bcrypt-only before any real use.
+- No tests yet. Transaction and rollback behaviour in the procedures would be the first thing to test.
 
-## 📡 API Endpoints
-- `GET /api/students?search=&semester=`: Student directory (faculty JWT; optional filters).
-- `GET /api/faculty/:id/evaluations`: Grading queue for that faculty (faculty JWT; id must match token).
-- `PUT /api/evaluations/:evaluationId`: Update marks (faculty JWT; must own the row).
-- `POST /api/malpractice`: Create malpractice report (faculty JWT).
-- `GET /api/audit-log?limit=`: Latest audit rows (faculty JWT; requires `audit_log` + triggers in DB).
-- `GET /api/results/:studentId`: Joined result data.
-- `GET /api/timetable`: Full exam schedule.
-- `GET /api/hall/:studentId`: Seat allocation details.
-- `POST /api/register`: Register for exams.
+## Stack
+MySQL (procedures, triggers, views, indexes) · Node.js, Express, mysql2, jsonwebtoken, bcryptjs, express-validator, morgan · React 19, Vite, Tailwind v4, Recharts, jsPDF.
