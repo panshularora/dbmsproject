@@ -5,7 +5,8 @@ CREATE TRIGGER trg_evaluations_before_insert
 BEFORE INSERT ON evaluations
 FOR EACH ROW
 BEGIN
-    IF NEW.marks >= 90 THEN SET NEW.grade = 'O';
+    IF NEW.marks IS NULL THEN SET NEW.grade = NULL; -- pending evaluation, not an F
+    ELSEIF NEW.marks >= 90 THEN SET NEW.grade = 'O';
     ELSEIF NEW.marks >= 80 THEN SET NEW.grade = 'A+';
     ELSEIF NEW.marks >= 70 THEN SET NEW.grade = 'A';
     ELSEIF NEW.marks >= 60 THEN SET NEW.grade = 'B+';
@@ -20,7 +21,8 @@ CREATE TRIGGER trg_evaluations_before_update
 BEFORE UPDATE ON evaluations
 FOR EACH ROW
 BEGIN
-    IF NEW.marks >= 90 THEN SET NEW.grade = 'O';
+    IF NEW.marks IS NULL THEN SET NEW.grade = NULL; -- pending evaluation, not an F
+    ELSEIF NEW.marks >= 90 THEN SET NEW.grade = 'O';
     ELSEIF NEW.marks >= 80 THEN SET NEW.grade = 'A+';
     ELSEIF NEW.marks >= 70 THEN SET NEW.grade = 'A';
     ELSEIF NEW.marks >= 60 THEN SET NEW.grade = 'B+';
