@@ -16,7 +16,7 @@ app.use(cors({
   exposedHeaders: ['X-SQL-Query']
 }));
 app.use(express.json());
-app.use(morgan('dev'));
+if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
 // --- Middleware ---
 
@@ -633,8 +633,13 @@ async function ensureDemoUsers() {
   }
 }
 
-ensureDemoUsers().finally(() => {
-  app.listen(PORT, () => {
-    console.log(`Backend Server running on http://localhost:${PORT}`);
+// Start listening only when run directly (`npm start`, `npm run server`); tests import the app.
+if (require.main === module) {
+  ensureDemoUsers().finally(() => {
+    app.listen(PORT, () => {
+      console.log(`Backend Server running on http://localhost:${PORT}`);
+    });
   });
-});
+}
+
+module.exports = app;
